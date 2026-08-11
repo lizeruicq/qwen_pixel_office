@@ -237,6 +237,9 @@ export function initPanels(socket) {
           if (p.conversationId === curConv && !drawer.classList.contains('closed') && tab === 'messages') {
             addMsgLine({ sender: p.sender || '?', text: p.text || '' });
           }
+        } else if (msg.kind.startsWith('action_')) {
+          const notes = Array.isArray(p.notes) && p.notes.length ? `（${p.notes.join('；')}）` : '';
+          addEvent('action', `${p.text ?? '操作'}${notes}`);
         } else {
           addEvent(msg.kind, p.subject ?? '');
         }

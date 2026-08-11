@@ -37,6 +37,12 @@ export interface Numbers {
     todoCompleteByPriority: Record<string, number>;
     overdueRebound: number;
     allClear: number;
+    /** 待办出现时一次性扣心情：阈值内每条扣量 */
+    newTodoMoodCost: number;
+    /** 超过该未完成数量后，每条新待办按 newTodoMoodCostOver 扣 */
+    newTodoMoodCostOverThreshold: number;
+    /** 超额时每条新待办的扣量 */
+    newTodoMoodCostOver: number;
     nearDuePerMin: number;
     nearDueCapPerMin: number;
     overduePerMin: number;
@@ -344,6 +350,17 @@ export class GameState {
     this.addXp(this.numbers.xp.todoComplete);
     this.changed();
     return [`待办外部完成 金币 +${coinGain}，心情 +${moodGain}，XP +${this.numbers.xp.todoComplete}`];
+  }
+
+  /** 待办出现时一次性扣心情：≤阈值每条 -newTodoMoodCost，超过阈值每条 -newTodoMoodCostOver（按加入后的未完成总数定档） */
+  onTodoAdded(openCount: number, now = Date.now()): string[] {
+    this.checkDailyReset(now);
+    this.lastInteractionTs = now;
+    const m = this.numbers.mood;
+    const cost = openCount > m.newTodoMoodCostOverThreshold ? m.newTodoMoodCostOver : m.newTodoMoodCost;
+    this.p.mood = this.clampMood(this.p.mood - cost);
+    this.changed();
+    return [`新待办出现（当前未完成 ${openCount} 条）心情 -${cost}`];
   }
 
   checkAllClear(todos: TodoItem[], now = Date.now()): string[] {

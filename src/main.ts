@@ -198,6 +198,11 @@ async function main(): Promise<void> {
       log('todo', `变化 ${d.kind}: [${d.item.taskId}] ${d.item.subject}`);
       const notes = game.onTodoDelta(d);
       if (notes.length > 0) log('game', notes.join('；'));
+      // 新待办出现：一次性扣心情（按加入后的未完成总数定档）
+      if (d.kind === 'added') {
+        const addNotes = game.onTodoAdded(poller.list().length);
+        if (addNotes.length > 0) log('game', addNotes.join('；'));
+      }
       push?.broadcast({ type: 'game_event', kind: `todo_${d.kind}`, payload: d.item, ts: Date.now() });
       push?.broadcastTodos();
     },
@@ -220,6 +225,23 @@ async function main(): Promise<void> {
     onAction: (ev) => {
       const notes = game.applyAction(ev);
       log('game', `结算 ${ev.kind}：${notes.join('；') || '无数值变化'}`);
+      // 玩家主动新建待办同样视为"待办出现"，一次性扣心情
+      if (ev.kind === 'todo_created') {
+        const addNotes = game.onTodoAdded(poller.list().length);
+        if (addNotes.length > 0) log('game', addNotes.join('；'));
+      }
+      // 主动操作也进事件流（与被动轮询 diff 区分，kind 带 action_ 前缀）
+      let text = '';
+      if (ev.kind === 'todo_completed') text = '完成待办';
+      else if (ev.kind === 'message_sent') text = ev.scope === 'group' ? '发送群消息' : '发送单聊消息';
+      else if (ev.kind === 'todo_created') text = '新建待办';
+      else if (ev.kind === 'approval_done') text = '处理审批';
+      push?.broadcast({
+        type: 'game_event',
+        kind: `action_${ev.kind}`,
+        payload: { text, notes },
+        ts: Date.now(),
+      });
     },
   };
 
