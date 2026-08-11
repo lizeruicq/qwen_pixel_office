@@ -1,0 +1,10 @@
+{
+  "dwsBin": "dws",
+  "pollIntervalSec": 120,
+  "todoPageSize": 50,
+  "llm": {
+    "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "model": "qwen-plus",
+    "apiKeyEnv": ["PIXEL_LLM_API_KEY", "DASHSCOPE_API_KEY"]
+  }
+}

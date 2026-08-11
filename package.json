@@ -1,0 +1,25 @@
+{
+  "name": "pixel-office-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "像素办公室本地后端：钉钉桥接 + 游戏事件 + AI 秘书（P1 最小闭环）",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "dev": "npm run build && node dist/main.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.0.0",
+    "@types/ws": "^8.5.12",
+    "typescript": "^5.6.0"
+  }
+}
