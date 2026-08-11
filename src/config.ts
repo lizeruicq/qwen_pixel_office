@@ -14,6 +14,7 @@ export interface AppConfig {
   dwsBin: string;
   pollIntervalSec: number;
   todoPageSize: number;
+  wsPort: number;
   llm: LlmConfig;
 }
 
@@ -35,6 +36,7 @@ export function loadConfig(): AppConfig {
     dwsBin: raw.dwsBin ?? 'dws',
     pollIntervalSec: raw.pollIntervalSec ?? 120,
     todoPageSize: raw.todoPageSize ?? 50,
+    wsPort: Number(process.env.PIXEL_WS_PORT ?? raw.wsPort ?? 8787),
     llm: {
       baseUrl: process.env.PIXEL_LLM_BASE_URL ?? raw.llm?.baseUrl ?? 'https://dashscope.aliyuncs.com/compatible-mode/v1',
       model: process.env.PIXEL_LLM_MODEL ?? raw.llm?.model ?? 'qwen-plus',

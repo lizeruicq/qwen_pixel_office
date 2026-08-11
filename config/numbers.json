@@ -1,0 +1,71 @@
+{
+  "initial": { "energy": 100, "mood": 70, "focus": 50, "coins": 0, "level": 1, "xp": 0 },
+  "energy": {
+    "capByLevel": [
+      { "minLevel": 10, "cap": 150 },
+      { "minLevel": 5, "cap": 120 },
+      { "minLevel": 1, "cap": 100 }
+    ],
+    "cost": {
+      "message": 2,
+      "todoByPriority": { "10": 8, "20": 12, "30": 16, "40": 22 },
+      "approval": 4,
+      "docDraft": 5
+    },
+    "regen": {
+      "activePerMin": 0.1,
+      "idlePerMin": 0.25,
+      "idleAfterMin": 5,
+      "restPerMin": 3,
+      "restMaxMin": 15,
+      "busyProtectionCompletedThreshold": 8,
+      "busyProtectionMultiplier": 1.5
+    },
+    "focusMaxDiscount": 0.3
+  },
+  "mood": {
+    "tiers": [
+      { "name": "兴奋", "min": 90, "energyFactor": 0.8 },
+      { "name": "开心", "min": 70, "energyFactor": 1.0 },
+      { "name": "平静", "min": 40, "energyFactor": 1.0 },
+      { "name": "疲惫", "min": 20, "energyFactor": 1.2 },
+      { "name": "倦怠", "min": 0, "energyFactor": 1.2 }
+    ],
+    "todoCompleteByPriority": { "10": 4, "20": 6, "30": 8, "40": 12 },
+    "overdueRebound": 8,
+    "allClear": 10,
+    "nearDuePerMin": 0.5,
+    "nearDueCapPerMin": 2,
+    "overduePerMin": 1,
+    "overdueCapPerMin": 3,
+    "lowEnergyThreshold": 20,
+    "lowEnergyPerMin": 1,
+    "restPerMin": 2,
+    "idleDecayAfterMin": 120,
+    "idleDecayPerHour": 1,
+    "idleDecayFloor": 40,
+    "lateNight": { "startHour": 22, "endHour": 8, "perEvent": -2, "maxPerHour": 3 },
+    "atPressure": { "groupMsgWindowMin": 5, "groupMsgThreshold": 10, "perEvent": -2, "cooldownMin": 30 },
+    "focusInterrupt": -10
+  },
+  "coins": {
+    "todoCompleteByPriority": { "10": 10, "20": 15, "30": 22, "40": 30 },
+    "todoCompleteDailyCap": 200,
+    "atResponse": 3,
+    "atResponseWindowMin": 30,
+    "atResponseDailyCap": 30,
+    "messageReply": 1,
+    "messageReplyDailyCap": 20,
+    "approval": 5,
+    "approvalDailyCap": 30,
+    "dailyStart": 5,
+    "allClear": 20
+  },
+  "xp": { "todoComplete": 10, "levelBase": 100 },
+  "focus": {
+    "convergePerMin": 0.1,
+    "batchBonus": 15,
+    "batchWindowMin": 10,
+    "batchMinActions": 3
+  }
+}

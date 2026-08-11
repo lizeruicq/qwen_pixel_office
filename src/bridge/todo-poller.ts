@@ -28,6 +28,7 @@ export class TodoPoller {
     private intervalSec: number,
     private store: Store,
     private onDelta: (d: TodoDelta) => void,
+    private onPolled?: (size: number) => void,
   ) {}
 
   async start(): Promise<void> {
@@ -112,6 +113,7 @@ export class TodoPoller {
       this.bootstrapped = true;
       this.persist();
       for (const d of deltas) this.onDelta(d);
+      this.onPolled?.(fresh.size);
       log('todo', `轮询完成：${fresh.size} 条未完成，${deltas.length} 个变化`);
     } finally {
       this.polling = false;
@@ -144,6 +146,12 @@ export class TodoPoller {
   addLocal(item: TodoItem): void {
     this.items.set(item.taskId, item);
     this.persist();
+  }
+
+  /** 查询待办的临期/逾期标记（用于逾期回补奖励判定） */
+  getFlags(taskId: string): { nearDue: boolean; overdue: boolean } {
+    const e = this.items.get(taskId);
+    return { nearDue: Boolean(e?.nearDueNotified), overdue: Boolean(e?.overdueNotified) };
   }
 
   private persist(): void {

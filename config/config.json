@@ -1,7 +1,8 @@
 {
-  "dwsBin": "dws",
+  "dwsBin": "/Users/zeruili/.qwenworkcn/bin/dws",
   "pollIntervalSec": 120,
   "todoPageSize": 50,
+  "wsPort": 8787,
   "llm": {
     "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
     "model": "qwen-plus",

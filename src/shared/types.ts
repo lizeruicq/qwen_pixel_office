@@ -35,3 +35,51 @@ export interface TodoDelta {
   kind: TodoDeltaKind;
   item: TodoItem;
 }
+
+/* ---------- P2：属性与协议类型 ---------- */
+
+export type MoodTierName = '兴奋' | '开心' | '平静' | '疲惫' | '倦怠';
+
+/** 四属性轴快照（server→client 的 state 消息体） */
+export interface StateSnapshot {
+  energy: number;
+  energyCap: number;
+  mood: number;
+  moodTier: MoodTierName;
+  focus: number;
+  coins: number;
+  xp: number;
+  level: number;
+  resting: boolean;
+  completedToday: number;
+  date: string;
+}
+
+/** 工具成功执行后产生的结算动作（操作通道 → 游戏逻辑层） */
+export type ActionEvent =
+  | { kind: 'message_sent'; scope: 'group' | 'o2o'; conversationId?: string }
+  | { kind: 'todo_completed'; taskId: string; priority: number; wasOverdue: boolean }
+  | { kind: 'todo_created' }
+  | { kind: 'approval_done' };
+
+/** server→client 推送消息 */
+export type ServerMessage =
+  | { type: 'hello'; ts: number }
+  | { type: 'state'; state: StateSnapshot }
+  | { type: 'game_event'; kind: string; payload: unknown; ts: number }
+  | { type: 'todos'; items: TodoItem[] }
+  | {
+      type: 'agent_card';
+      stage: 'draft' | 'tool' | 'result';
+      requestId?: string;
+      tool?: string;
+      preview?: string;
+      text?: string;
+    }
+  | { type: 'notice'; text: string; ts: number };
+
+/** client→server 请求消息 */
+export type ClientMessage =
+  | { type: 'action'; name: string; params?: Record<string, unknown> }
+  | { type: 'confirm'; requestId: string; approved: boolean }
+  | { type: 'agent_chat'; text: string };

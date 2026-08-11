@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>像素办公室 · 调试页</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: ui-monospace, "SF Mono", Menlo, monospace; background: #14161a; color: #d8dee6; font-size: 13px; }
+  header { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: #1c1f26; border-bottom: 1px solid #2a2e38; }
+  header h1 { font-size: 14px; margin: 0; }
+  #dot { width: 9px; height: 9px; border-radius: 50%; background: #e5534b; }
+  #dot.ok { background: #57ab5a; }
+  main { display: grid; grid-template-columns: 320px 1fr 1fr; gap: 12px; padding: 12px 16px; }
+  section { background: #1c1f26; border: 1px solid #2a2e38; border-radius: 8px; padding: 12px; min-height: 80vh; }
+  h2 { font-size: 12px; margin: 0 0 10px; color: #8b949e; letter-spacing: 1px; }
+  .bar { margin-bottom: 10px; }
+  .bar label { display: flex; justify-content: space-between; margin-bottom: 3px; color: #adbac7; }
+  .track { height: 12px; background: #2a2e38; border-radius: 6px; overflow: hidden; }
+  .fill { height: 100%; border-radius: 6px; transition: width .4s; }
+  #f-energy { background: #eac54f; } #f-mood { background: #f47067; } #f-focus { background: #6cb6ff; }
+  .kv { display: flex; gap: 14px; margin: 10px 0; color: #adbac7; }
+  .kv b { color: #eac54f; }
+  button { background: #2a2e38; color: #d8dee6; border: 1px solid #3d4451; border-radius: 6px; padding: 5px 10px; cursor: pointer; font-family: inherit; font-size: 12px; margin: 2px 4px 2px 0; }
+  button:hover { background: #3d4451; }
+  button.primary { background: #316dca; border-color: #4184e4; }
+  button.danger { background: #8b2c34; border-color: #b04550; }
+  input { background: #14161a; border: 1px solid #3d4451; color: #d8dee6; border-radius: 6px; padding: 6px 8px; font-family: inherit; font-size: 12px; width: 100%; margin: 3px 0; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { padding: 5px 6px; border-bottom: 1px solid #23272f; word-break: break-all; }
+  li:last-child { border-bottom: none; }
+  .card { border: 1px solid #3d4451; border-radius: 6px; padding: 8px; margin-bottom: 8px; background: #20242c; }
+  .card.draft { border-color: #eac54f; }
+  .tag { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 8px; background: #2a2e38; color: #8b949e; margin-right: 6px; }
+  .tag.group_msg { background: #1f3d5c; color: #6cb6ff; }
+  .tag.at_me { background: #5c1f24; color: #f47067; }
+  .tag.o2o_msg { background: #24461f; color: #8ddb8c; }
+  .tag.todo_added,.tag.todo_done,.tag.todo_near_due,.tag.todo_overdue { background: #43341c; color: #eac54f; }
+  .dim { color: #636e7b; }
+  .tier { font-weight: bold; }
+  .tier-兴奋 { color: #eac54f; } .tier-开心 { color: #8ddb8c; } .tier-平静 { color: #6cb6ff; } .tier-疲惫 { color: #dc8850; } .tier-倦怠 { color: #f47067; }
+</style>
+</head>
+<body>
+<header>
+  <div id="dot"></div>
+  <h1>像素办公室 · P2 调试页</h1>
+  <span class="dim" id="conn">未连接</span>
+</header>
+<main>
+  <section>
+    <h2>小人状态</h2>
+    <div class="bar"><label>能量 <span id="v-energy">-</span></label><div class="track"><div class="fill" id="f-energy"></div></div></div>
+    <div class="bar"><label>心情 <span id="v-mood">-</span></label><div class="track"><div class="fill" id="f-mood"></div></div></div>
+    <div class="bar"><label>专注 <span id="v-focus">-</span></label><div class="track"><div class="fill" id="f-focus"></div></div></div>
+    <div class="kv">
+      <span>金币 <b id="v-coins">0</b></span>
+      <span>Lv <b id="v-level">1</b></span>
+      <span>XP <span id="v-xp">0</span></span>
+      <span>今日完成 <span id="v-done">0</span></span>
+    </div>
+    <div class="kv">心情档位：<span class="tier" id="v-tier">-</span>　<span class="dim" id="v-rest"></span></div>
+    <button id="btn-rest">开始休息</button>
+    <h2 style="margin-top:16px">操作</h2>
+    <button onclick="act('list_todos')">看待办</button>
+    <button onclick="completeTodo()">完成待办</button>
+    <button onclick="createTodo()">新建待办</button>
+    <button onclick="sendGroup()">发群消息</button>
+    <h2 style="margin-top:16px">AI 秘书</h2>
+    <input id="chat" placeholder="自然语言指令（需配置 LLM）" onkeydown="if(event.key==='Enter')chat()">
+    <button class="primary" onclick="chat()">发送</button>
+    <h2 style="margin-top:16px">卡片</h2>
+    <div id="cards"></div>
+  </section>
+
+  <section>
+    <h2>待办列表</h2>
+    <ul id="todos"><li class="dim">等待数据…</li></ul>
+  </section>
+
+  <section>
+    <h2>事件流</h2>
+    <ul id="events"></ul>
+  </section>
+</main>
+<script>
+let ws, state = null;
+const $ = (id) => document.getElementById(id);
+const tierClass = (t) => 'tier tier-' + t;
+
+function connect() {
+  ws = new WebSocket(`ws://${location.host}`);
+  ws.onopen = () => { $('dot').classList.add('ok'); $('conn').textContent = `ws://${location.host} 已连接`; };
+  ws.onclose = () => { $('dot').classList.remove('ok'); $('conn').textContent = '断开，3 秒后重连'; setTimeout(connect, 3000); };
+  ws.onmessage = (e) => route(JSON.parse(e.data));
+}
+
+function route(msg) {
+  switch (msg.type) {
+    case 'state': state = msg.state; renderState(); break;
+    case 'todos': renderTodos(msg.items); break;
+    case 'game_event': addEvent(msg); break;
+    case 'agent_card': addCard(msg); break;
+    case 'notice': addEvent({ kind: 'notice', payload: { text: msg.text }, ts: msg.ts }); break;
+  }
+}
+
+function renderState() {
+  const s = state; if (!s) return;
+  $('v-energy').textContent = `${s.energy} / ${s.energyCap}`;
+  $('f-energy').style.width = `${Math.min(100, s.energy / s.energyCap * 100)}%`;
+  $('v-mood').textContent = s.mood;
+  $('f-mood').style.width = `${s.mood}%`;
+  $('v-focus').textContent = s.focus;
+  $('f-focus').style.width = `${s.focus}%`;
+  $('v-coins').textContent = s.coins;
+  $('v-level').textContent = s.level;
+  $('v-xp').textContent = s.xp;
+  $('v-done').textContent = s.completedToday;
+  $('v-tier').textContent = s.moodTier;
+  $('v-tier').className = tierClass(s.moodTier);
+  $('v-rest').textContent = s.resting ? '休息中…' : '';
+  $('btn-rest').textContent = s.resting ? '结束休息' : '开始休息';
+}
+
+function renderTodos(items) {
+  const ul = $('todos');
+  if (!items.length) { ul.innerHTML = '<li class="dim">没有未完成待办</li>'; return; }
+  const color = { 10: '#8b949e', 20: '#6cb6ff', 30: '#dc8850', 40: '#f47067' };
+  ul.innerHTML = items.map((t) =>
+    `<li><span style="color:${color[t.priority] || '#fff'}">●</span> [${t.priority}] ${t.subject}` +
+    (t.dueTime ? ` <span class="dim">截止 ${new Date(t.dueTime).toLocaleString('zh-CN')}</span>` : '') +
+    ` <button onclick="act('complete_todo',{taskId:'${t.taskId}'})">完成</button></li>`
+  ).join('');
+}
+
+function addEvent(msg) {
+  const ul = $('events');
+  const li = document.createElement('li');
+  const time = new Date(msg.ts).toLocaleTimeString('zh-CN', { hour12: false });
+  let body = '';
+  const p = msg.payload || {};
+  if (msg.kind === 'group_msg' || msg.kind === 'at_me' || msg.kind === 'o2o_msg') {
+    body = `${p.sender || '?'}: ${p.text || ''}`;
+  } else if (msg.kind === 'notice') {
+    body = p.text || '';
+  } else {
+    body = `[${p.taskId || ''}] ${p.subject || ''}`;
+  }
+  li.innerHTML = `<span class="dim">${time}</span> <span class="tag ${msg.kind}">${msg.kind}</span>${body.replace(/</g, '&lt;')}`;
+  ul.prepend(li);
+  while (ul.children.length > 100) ul.removeChild(ul.lastChild);
+}
+
+function addCard(msg) {
+  const box = $('cards');
+  if (msg.stage === 'draft') {
+    const div = document.createElement('div');
+    div.className = 'card draft';
+    div.innerHTML = `<div class="dim">草稿确认</div><pre style="white-space:pre-wrap;margin:6px 0">${(msg.preview || '').replace(/</g, '&lt;')}</pre>`;
+    const ok = document.createElement('button'); ok.className = 'primary'; ok.textContent = '确认执行';
+    const no = document.createElement('button'); no.className = 'danger'; no.textContent = '取消';
+    ok.onclick = () => { send({ type: 'confirm', requestId: msg.requestId, approved: true }); div.remove(); };
+    no.onclick = () => { send({ type: 'confirm', requestId: msg.requestId, approved: false }); div.remove(); };
+    div.append(ok, no);
+    box.prepend(div);
+    return;
+  }
+  const div = document.createElement('div');
+  div.className = 'card';
+  const label = msg.stage === 'tool' ? `调用 ${msg.tool}` : (msg.tool ? `[${msg.tool}] ` : '');
+  div.textContent = label + (msg.text || '');
+  box.prepend(div);
+  while (box.children.length > 20) box.removeChild(box.lastChild);
+}
+
+function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+function act(name, params) { send({ type: 'action', name, params: params || {} }); }
+function chat() { const el = $('chat'); if (!el.value.trim()) return; send({ type: 'agent_chat', text: el.value.trim() }); el.value = ''; }
+function completeTodo() { const s = prompt('待办标题关键词或 taskId:'); if (s) act('complete_todo', /^\d+$/.test(s) ? { taskId: s } : { subject: s }); }
+function createTodo() { const t = prompt('新待办标题:'); if (t) act('create_todo', { title: t }); }
+function sendGroup() {
+  const g = prompt('群名关键词:'); if (!g) return;
+  const t = prompt('消息内容:'); if (!t) return;
+  act('send_group_message', { group: g, text: t });
+}
+$('btn-rest').onclick = () => { act(state && state.resting ? 'rest_stop' : 'rest_start'); };
+connect();
+</script>
+</body>
+</html>

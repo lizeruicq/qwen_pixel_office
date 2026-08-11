@@ -1,9 +1,13 @@
+/**
+ * 终端 REPL（P2 适配）：玩家输入 → 共享执行器/Agent 流程。
+ * 新增 /state（属性快照）、/rest（休息切换）。
+ */
 import * as readline from 'node:readline';
 import type { AppConfig } from '../config.js';
-import { chatOnce, SYSTEM_PROMPT, wrapExternalContent, wrapPlayerInput, type ChatMessage, type ToolCall } from './llm.js';
-import { dispatchTool, openAiToolSchemas, type ToolContext } from './tools.js';
-
-const MAX_TOOL_ITERATIONS = 6;
+import type { GameState } from '../game/state.js';
+import { runAgentFlow } from './agent-flow.js';
+import { executeTool, type ConfirmDriver } from './executor.js';
+import type { ToolContext } from './tools.js';
 
 export interface ReplHandle {
   stop(): void;
@@ -14,6 +18,8 @@ function printHelp(write: (s: string) => void): void {
     [
       '命令:',
       '  /todos                    查看未完成待办',
+      '  /state                    查看四属性快照',
+      '  /rest                     开始/结束休息（能量+心情加速恢复）',
       '  /call <工具名> <json参数>  直接调用工具（无需 LLM），如:',
       '                            /call list_todos {}',
       '                            /call send_group_message {"group":"测试","text":"hello"}',
@@ -24,11 +30,7 @@ function printHelp(write: (s: string) => void): void {
   );
 }
 
-/**
- * 终端 REPL：玩家输入 → AI 秘书（function calling）或 /call 直调。
- * 所有写操作在此处走“草稿预览 → 玩家确认”，并写审计表。
- */
-export function startRepl(cfg: AppConfig, ctx: ToolContext, onQuit: () => void): ReplHandle {
+export function startRepl(cfg: AppConfig, ctx: ToolContext, game: GameState, onQuit: () => void): ReplHandle {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const write = (s: string) => process.stdout.write(`${s}\n`);
 
@@ -39,10 +41,6 @@ export function startRepl(cfg: AppConfig, ctx: ToolContext, onQuit: () => void):
   const queue: string[] = [];
   const waiters: Array<(line: string) => void> = [];
 
-  /**
-   * 取一行输入：队列里已有（管道输入先到达）则立即取用；
-   * 否则等待下一行（交互输入）。EOF 时等待者收到空串，确认默认按取消处理。
-   */
   function nextLine(prompt: string): Promise<string> {
     if (queue.length > 0) {
       const line = queue.shift() as string;
@@ -53,63 +51,34 @@ export function startRepl(cfg: AppConfig, ctx: ToolContext, onQuit: () => void):
     return new Promise((resolve) => waiters.push(resolve));
   }
 
-  async function runToolWithConfirm(name: string, args: Record<string, unknown>): Promise<string> {
-    const outcome = await dispatchTool(name, args, ctx);
-    if (outcome.kind === 'error') return `[失败] ${outcome.text}`;
-    if (outcome.kind === 'result') return outcome.text;
-    write(`\n—— 草稿确认 ——\n${outcome.preview}`);
-    const answer = (await nextLine('执行吗? [y/N] ')).trim().toLowerCase();
-    if (answer !== 'y' && answer !== 'yes') {
-      ctx.store.audit(name, args, 'rejected', '玩家取消');
-      return '玩家已取消该操作，未执行。';
-    }
-    try {
-      const result = await outcome.run();
-      ctx.store.audit(name, args, 'confirmed', result);
-      return result;
-    } catch (e) {
-      ctx.store.audit(name, args, 'error', String(e));
-      return `执行出错: ${String(e)}`;
-    }
+  /** 终端确认驱动：草稿预览 → y/N */
+  const driver: ConfirmDriver = {
+    async confirm(_tool, _args, preview) {
+      write(`\n—— 草稿确认 ——\n${preview}`);
+      const answer = (await nextLine('执行吗? [y/N] ')).trim().toLowerCase();
+      return answer === 'y' || answer === 'yes';
+    },
+  };
+
+  const sink = {
+    text: (t: string) => write(t),
+    toolStart: (name: string, args: Record<string, unknown>) => write(`→ 调用工具 ${name} ${JSON.stringify(args)}`),
+  };
+
+  async function callTool(name: string, args: Record<string, unknown>): Promise<void> {
+    const r = await executeTool(name, args, ctx, driver);
+    if (r.status !== 'ok') write(`[${r.status}] ${r.text}`);
+    else write(r.text);
   }
 
-  async function agentFlow(input: string): Promise<void> {
-    if (!cfg.llm.enabled) {
-      write('LLM 未配置：请设置环境变量 PIXEL_LLM_API_KEY（或 DASHSCOPE_API_KEY），或使用 /call <工具> <json> 直调模式。');
-      return;
-    }
-    const messages: ChatMessage[] = [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: wrapPlayerInput(input) },
-    ];
-    for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
-      let resp: { content: string | null; toolCalls: ToolCall[] };
-      try {
-        resp = await chatOnce(cfg.llm, messages, openAiToolSchemas());
-      } catch (e) {
-        write(`LLM 调用失败: ${String(e)}`);
-        return;
-      }
-      if (resp.toolCalls.length === 0) {
-        if (resp.content) write(resp.content);
-        else write('(模型未返回内容)');
-        return;
-      }
-      messages.push({ role: 'assistant', content: resp.content ?? '', tool_calls: resp.toolCalls });
-      for (const tc of resp.toolCalls) {
-        let args: Record<string, unknown> = {};
-        try {
-          args = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};
-        } catch {
-          write(`[warn] 工具参数 JSON 解析失败: ${tc.function.arguments}`);
-        }
-        write(`→ 调用工具 ${tc.function.name} ${JSON.stringify(args)}`);
-        const result = await runToolWithConfirm(tc.function.name, args);
-        // 工具输出可能包含钉钉外部内容，回传给模型时同样按不可信数据包裹
-        messages.push({ role: 'tool', tool_call_id: tc.id, content: wrapExternalContent(result) });
-      }
-    }
-    write('(已达到最大工具调用轮数，终止本次请求)');
+  function printState(): void {
+    const s = game.snapshot();
+    write(
+      [
+        `能量 ${s.energy}/${s.energyCap} ｜ 心情 ${s.mood}（${s.moodTier}）｜ 专注 ${s.focus}`,
+        `金币 ${s.coins} ｜ Lv${s.level}（XP ${s.xp}）｜ 今日完成 ${s.completedToday} ｜ ${s.resting ? '休息中' : '工作中'}`,
+      ].join('\n'),
+    );
   }
 
   async function handle(line: string): Promise<void> {
@@ -124,7 +93,15 @@ export function startRepl(cfg: AppConfig, ctx: ToolContext, onQuit: () => void):
       return;
     }
     if (line === '/todos') {
-      write(await runToolWithConfirm('list_todos', {}));
+      await callTool('list_todos', {});
+      return;
+    }
+    if (line === '/state') {
+      printState();
+      return;
+    }
+    if (line === '/rest') {
+      write(game.snapshot().resting ? game.stopRest() : game.startRest());
       return;
     }
     if (line.startsWith('/call ')) {
@@ -139,14 +116,14 @@ export function startRepl(cfg: AppConfig, ctx: ToolContext, onQuit: () => void):
         write('参数 JSON 无效');
         return;
       }
-      write(await runToolWithConfirm(name, args));
+      await callTool(name, args);
       return;
     }
     if (line.startsWith('/')) {
       write(`未知命令 ${line}，/help 查看帮助`);
       return;
     }
-    await agentFlow(line);
+    await runAgentFlow(line, cfg, ctx, driver, sink);
   }
 
   async function pump(): Promise<void> {

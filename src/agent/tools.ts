@@ -10,6 +10,7 @@ import { log } from '../log.js';
 import type { Store } from '../db.js';
 import type { TodoPoller } from '../bridge/todo-poller.js';
 import { dwsJson } from '../bridge/dws-exec.js';
+import type { ActionEvent } from '../shared/types.js';
 
 export type ToolOutcome =
   | { kind: 'result'; text: string }
@@ -21,6 +22,10 @@ export interface ToolContext {
   selfUserId: string;
   poller: TodoPoller;
   store: Store;
+  /** 当前心情档位（游戏层注入）；倦怠档锁自动化工具 */
+  moodTier?: () => string;
+  /** 工具成功执行后的结算回调（仅玩家触发的工具成功结果会进入结算） */
+  onAction?: (ev: ActionEvent) => void;
 }
 
 export interface ToolDef {
@@ -201,7 +206,9 @@ export const TOOL_DEFS: ToolDef[] = [
             'true',
           ]);
           if (res?.success === false) return `命令返回异常: ${JSON.stringify(res).slice(0, 300)}`;
+          const wasOverdue = ctx.poller.getFlags(t.taskId).overdue;
           ctx.poller.dropLocal(t.taskId);
+          ctx.onAction?.({ kind: 'todo_completed', taskId: t.taskId, priority: t.priority, wasOverdue });
           return `已完成待办「${t.subject}」。`;
         },
       };
@@ -242,6 +249,7 @@ export const TOOL_DEFS: ToolDef[] = [
             text,
           ]);
           if (res?.success === false) return `发送失败: ${JSON.stringify(res).slice(0, 300)}`;
+          ctx.onAction?.({ kind: 'message_sent', scope: 'group', conversationId: ref.id });
           return `已发送到「${ref.title}」。`;
         },
       };
@@ -282,6 +290,7 @@ export const TOOL_DEFS: ToolDef[] = [
             text,
           ]);
           if (res?.success === false) return `发送失败: ${JSON.stringify(res).slice(0, 300)}`;
+          ctx.onAction?.({ kind: 'message_sent', scope: 'o2o' });
           return `已发送给「${ref.name}」。`;
         },
       };
@@ -379,6 +388,7 @@ export const TOOL_DEFS: ToolDef[] = [
             });
           }
           log('tool', `create_todo 成功 taskId=${taskId}`);
+          ctx.onAction?.({ kind: 'todo_created' });
           return `已创建待办「${title}」${taskId ? `(taskId=${taskId})` : ''}。`;
         },
       };
