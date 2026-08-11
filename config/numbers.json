@@ -16,8 +16,6 @@
       "activePerMin": 0.1,
       "idlePerMin": 0.25,
       "idleAfterMin": 5,
-      "restPerMin": 3,
-      "restMaxMin": 15,
       "busyProtectionCompletedThreshold": 8,
       "busyProtectionMultiplier": 1.5
     },
@@ -40,7 +38,7 @@
     "overdueCapPerMin": 3,
     "lowEnergyThreshold": 20,
     "lowEnergyPerMin": 1,
-    "restPerMin": 2,
+    "autoRegenPerMin": 0.2,
     "idleDecayAfterMin": 120,
     "idleDecayPerHour": 1,
     "idleDecayFloor": 40,

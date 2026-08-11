@@ -50,7 +50,6 @@ export interface StateSnapshot {
   coins: number;
   xp: number;
   level: number;
-  resting: boolean;
   completedToday: number;
   date: string;
 }
@@ -68,6 +67,8 @@ export type ServerMessage =
   | { type: 'state'; state: StateSnapshot }
   | { type: 'game_event'; kind: string; payload: unknown; ts: number }
   | { type: 'todos'; items: TodoItem[] }
+  | { type: 'conversations'; items: Array<{ id: string; kind: 'group' | 'o2o'; title: string; count: number }> }
+  | { type: 'messages'; convId: string; items: Array<{ sender: string; text: string; ts: string | number }> }
   | {
       type: 'agent_card';
       stage: 'draft' | 'tool' | 'result';
@@ -82,4 +83,5 @@ export type ServerMessage =
 export type ClientMessage =
   | { type: 'action'; name: string; params?: Record<string, unknown> }
   | { type: 'confirm'; requestId: string; approved: boolean }
+  | { type: 'panel'; name: 'conversations' | 'messages' | 'todos'; convId?: string }
   | { type: 'agent_chat'; text: string };

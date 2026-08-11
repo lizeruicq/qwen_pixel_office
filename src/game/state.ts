@@ -27,8 +27,6 @@ export interface Numbers {
       activePerMin: number;
       idlePerMin: number;
       idleAfterMin: number;
-      restPerMin: number;
-      restMaxMin: number;
       busyProtectionCompletedThreshold: number;
       busyProtectionMultiplier: number;
     };
@@ -45,7 +43,7 @@ export interface Numbers {
     overdueCapPerMin: number;
     lowEnergyThreshold: number;
     lowEnergyPerMin: number;
-    restPerMin: number;
+    autoRegenPerMin: number;
     idleDecayAfterMin: number;
     idleDecayPerHour: number;
     idleDecayFloor: number;
@@ -88,8 +86,6 @@ interface PersistShape {
   dailyEarn: Record<string, number>;
   dailyStartAwarded: boolean;
   allClearAwarded: boolean;
-  resting: boolean;
-  restMinutes: number;
 }
 
 const KV_KEY = 'game_state_v1';
@@ -132,8 +128,6 @@ export class GameState {
       dailyEarn: {},
       dailyStartAwarded: false,
       allClearAwarded: false,
-      resting: false,
-      restMinutes: 0,
     };
   }
 
@@ -291,22 +285,6 @@ export class GameState {
     }
   }
 
-  startRest(): string {
-    if (this.p.resting) return '已经在休息了';
-    this.p.resting = true;
-    this.p.restMinutes = 0;
-    this.lastActionTs = Date.now();
-    this.changed();
-    return `小人坐下休息（能量 +${this.numbers.energy.regen.restPerMin}/分钟，心情 +${this.numbers.mood.restPerMin}/分钟，上限 ${this.numbers.energy.regen.restMaxMin} 分钟）`;
-  }
-
-  stopRest(): string {
-    if (!this.p.resting) return '当前没有在休息';
-    this.p.resting = false;
-    this.changed();
-    return '休息结束，回到工位';
-  }
-
   /* ---------- 展示通道入口：钉钉事件只影响数值，绝不触发操作 ---------- */
 
   onImEvent(ev: GameEvent, now = Date.now()): string[] {
@@ -388,22 +366,11 @@ export class GameState {
     const prevTier = this.moodTier().name;
     const rg = this.numbers.energy.regen;
 
-    // 能量恢复：休息 > 空闲 > 活跃；忙碌保护
-    if (this.p.resting) {
-      if (this.p.restMinutes < rg.restMaxMin) {
-        this.p.energy += rg.restPerMin;
-        this.p.restMinutes += 1;
-        this.p.mood = this.clampMood(this.p.mood + this.numbers.mood.restPerMin);
-      } else {
-        this.p.resting = false;
-        this.notice('休息好了，精力恢复！');
-      }
-    } else {
-      const idleMin = (now - this.lastActionTs) / 60_000;
-      let rate = idleMin >= rg.idleAfterMin ? rg.idlePerMin : rg.activePerMin;
-      if (this.p.completedToday >= rg.busyProtectionCompletedThreshold) rate *= rg.busyProtectionMultiplier;
-      this.p.energy += rate;
-    }
+    // 能量自动恢复：空闲 > 活跃；忙碌保护
+    const idleMin = (now - this.lastActionTs) / 60_000;
+    let rate = idleMin >= rg.idleAfterMin ? rg.idlePerMin : rg.activePerMin;
+    if (this.p.completedToday >= rg.busyProtectionCompletedThreshold) rate *= rg.busyProtectionMultiplier;
+    this.p.energy += rate;
     this.p.energy = Math.min(this.energyCap(), this.p.energy);
 
     // 心情持续压力：临期/逾期/低能量（负反馈只做提示）
@@ -419,7 +386,7 @@ export class GameState {
       Math.min(nearDue * m.nearDuePerMin, m.nearDueCapPerMin) +
       Math.min(overdue * m.overduePerMin, m.overdueCapPerMin) +
       (this.p.energy < m.lowEnergyThreshold ? m.lowEnergyPerMin : 0);
-    this.p.mood = this.clampMood(this.p.mood - pressure);
+    this.p.mood = this.clampMood(this.p.mood - pressure + m.autoRegenPerMin);
 
     // 长时间无互动缓慢下降（不穿透平静档下限）
     if ((now - this.lastInteractionTs) / 60_000 >= m.idleDecayAfterMin && this.p.mood > m.idleDecayFloor) {
@@ -445,7 +412,6 @@ export class GameState {
       coins: this.p.coins,
       xp: this.p.xp,
       level: this.p.level,
-      resting: this.p.resting,
       completedToday: this.p.completedToday,
       date: this.p.date,
     };

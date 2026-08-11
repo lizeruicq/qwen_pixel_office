@@ -24,6 +24,8 @@ export interface ToolContext {
   store: Store;
   /** 当前心情档位（游戏层注入）；倦怠档锁自动化工具 */
   moodTier?: () => string;
+  /** 会话注册表快照（主入口注入），供 list_conversations 工具 */
+  listConversations?: () => Array<{ id: string; kind: string; title: string; count: number }>;
   /** 工具成功执行后的结算回调（仅玩家触发的工具成功结果会进入结算） */
   onAction?: (ev: ActionEvent) => void;
 }
@@ -210,6 +212,73 @@ export const TOOL_DEFS: ToolDef[] = [
           ctx.poller.dropLocal(t.taskId);
           ctx.onAction?.({ kind: 'todo_completed', taskId: t.taskId, priority: t.priority, wasOverdue });
           return `已完成待办「${t.subject}」。`;
+        },
+      };
+    },
+  },
+
+  {
+    name: 'list_conversations',
+    description: '列出最近活跃的钉钉会话（群/单聊标题与消息数），供选择总结目标',
+    parameters: { type: 'object', properties: {}, additionalProperties: false },
+    confirm: 'none',
+    async run(_args, ctx) {
+      const convs = ctx.listConversations?.() ?? [];
+      if (convs.length === 0) return { kind: 'result', text: '暂无已观察到的会话。' };
+      const lines = convs.slice(0, 10).map((c) => `- [${c.id}] ${c.title}（${c.count} 条）`);
+      return { kind: 'result', text: `最近会话:\n${lines.join('\n')}` };
+    },
+  },
+
+  {
+    name: 'comment_todo',
+    description: '给一条钉钉待办添加评论/备注。优先传 taskId；只传 subject 时做模糊匹配',
+    parameters: {
+      type: 'object',
+      properties: {
+        taskId: { type: 'string', description: '待办任务 ID（推荐）' },
+        subject: { type: 'string', description: '待办标题关键词（taskId 未知时使用）' },
+        content: { type: 'string', description: '评论内容' },
+      },
+      required: ['content'],
+      additionalProperties: false,
+    },
+    confirm: 'draft',
+    async run(args, ctx) {
+      const content = String(args.content ?? '').trim();
+      if (!content) return { kind: 'error', text: 'content 不能为空。' };
+      const todos = ctx.poller.list();
+      let target;
+      if (args.taskId) {
+        target = todos.find((t) => t.taskId === String(args.taskId));
+      } else if (args.subject) {
+        const kw = String(args.subject);
+        const matches = todos.filter((t) => t.subject.includes(kw) || kw.includes(t.subject));
+        if (matches.length === 1) target = matches[0];
+        if (matches.length > 1) {
+          return {
+            kind: 'error',
+            text: `匹配到多条待办，请用 taskId 指定:\n${matches.map((m) => `- [${m.taskId}] ${m.subject}`).join('\n')}`,
+          };
+        }
+      }
+      if (!target) return { kind: 'error', text: '未找到匹配的待办。请先调用 list_todos 获取 taskId。' };
+      const t = target;
+      return {
+        kind: 'confirm',
+        preview: `给待办「${t.subject}」加评论：${content}`,
+        run: async () => {
+          const res = await dwsJson<{ success?: boolean }>(ctx.dwsBin, [
+            'todo',
+            'comment',
+            'add',
+            '--task-id',
+            t.taskId,
+            '--content',
+            content,
+          ]);
+          if (res?.success === false) return `评论失败: ${JSON.stringify(res).slice(0, 300)}`;
+          return `已评论「${t.subject}」。`;
         },
       };
     },

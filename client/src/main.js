@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import {
-  TILE, MAP, T, floorLayout, OBJECTS, FOOTPRINTS, HOTSPOTS, WALK_BOUNDS, SPAWN, GLOWS,
+  TILE, MAP, T, floorLayout, OBJECTS, FOOTPRINTS, HOTSPOTS, WALK_BOUNDS, SPAWN, GLOWS, PANEL_TRIGGERS,
 } from './config/scene.js';
 import { GameSocket } from './net/ws.js';
+import { initPanels } from './ui/panels.js';
 
 const W = MAP.cols * TILE; // 352
 const H = MAP.rows * TILE; // 224
@@ -98,30 +99,34 @@ class OfficeScene extends Phaser.Scene {
     // 点击地板走过去
     this.input.on('pointerdown', (p) => {
       const wp = this.cameras.main.getWorldPoint(p.x, p.y);
+      for (const t of PANEL_TRIGGERS) {
+        if (wp.x >= t.x - t.w / 2 && wp.x <= t.x + t.w / 2 && wp.y >= t.y - t.h && wp.y <= t.y) {
+          this.panels?.openTab(t.tab);
+          return;
+        }
+      }
       this.mainTarget = {
         x: Phaser.Math.Clamp(wp.x, WALK_BOUNDS.minX, WALK_BOUNDS.maxX),
         y: Phaser.Math.Clamp(wp.y, WALK_BOUNDS.minY, WALK_BOUNDS.maxY),
       };
     });
 
-    // 台词气泡（世界空间小盒子）
-    this.bubble = this.add.text(SPAWN.x, SPAWN.y - 30, '', {
-      fontFamily: 'ui-monospace, Menlo, monospace', fontSize: '7px',
-      backgroundColor: '#14151ccc', color: '#eac54f', padding: { x: 4, y: 2 },
-    }).setOrigin(0.5, 1).setDepth(950).setVisible(false);
-
     // ---------- WebSocket ----------
     const wsUrl = new URLSearchParams(location.search).get('ws') || 'ws://localhost:8787';
     this.socket = new GameSocket(wsUrl, {
       onStatus: (ok) => {
         this.wsOk = ok;
-        this.setTicker(ok ? `已连接后端 ${wsUrl}` : '未连接后端（server 目录 npm start 后自动重连）');
         this.renderHud();
       },
       onMessage: (m) => this.onWs(m),
     });
-    this.state = { energy: 100, energyCap: 100, mood: 70, focus: 50, coins: 0, level: 1, moodTier: '开心', resting: false };
+    this.state = { energy: 100, energyCap: 100, mood: 70, focus: 50, coins: 0, level: 1, moodTier: '开心' };
     this.renderHud();
+
+    // ---------- 抽屉面板 ----------
+    this.panels = initPanels(this.socket);
+    const autoPanel = new URLSearchParams(location.search).get('panel');
+    if (['tasks', 'messages', 'events', 'secretary'].includes(autoPanel)) this.panels.openTab(autoPanel);
   }
 
   /* ---------- UI ---------- */
@@ -137,49 +142,18 @@ class OfficeScene extends Phaser.Scene {
     $('v-coins').textContent = s.coins;
     $('v-level').textContent = s.level;
     $('v-tier').textContent = s.moodTier;
-    $('v-rest').textContent = s.resting ? ' ｜ 休息中' : '';
     $('v-off').textContent = this.wsOk ? '' : ' ｜ 离线';
   }
 
-  setTicker(text, color = '#8b949e') {
-    const t = new Date().toLocaleTimeString('zh-CN', { hour12: false });
-    const el = $('ticker');
-    el.textContent = `[${t}] ${text}`;
-    el.style.color = color;
-  }
-
   onWs(msg) {
+    this.panels?.handleWs(msg);
     switch (msg.type) {
-      case 'state': {
+      case 'state':
         this.state = msg.state;
-        if (msg.state.resting && !this.resting) {
-          const sofa = HOTSPOTS.find((h) => h.id === 'sofa');
-          this.mainTarget = { x: sofa.x, y: sofa.y };
-          this.bubble.setText('☕ 休息中…').setVisible(true);
-        } else if (!msg.state.resting && this.resting) {
-          this.bubble.setVisible(false);
-        }
-        this.resting = msg.state.resting;
         this.renderHud();
         break;
-      }
       case 'todos':
         this.todoCount = msg.items.length;
-        break;
-      case 'game_event': {
-        const p = msg.payload ?? {};
-        if (msg.kind === 'group_msg' || msg.kind === 'at_me' || msg.kind === 'o2o_msg') {
-          this.setTicker(`${msg.kind === 'at_me' ? '❗@我 ' : ''}${p.sender ?? '?'}：${(p.text ?? '').slice(0, 60)}`, msg.kind === 'at_me' ? '#f47067' : '#6cb6ff');
-        } else {
-          this.setTicker(`待办 ${msg.kind.replace('todo_', '')}：${p.subject ?? ''}`, '#eac54f');
-        }
-        break;
-      }
-      case 'notice':
-        this.setTicker(msg.text, '#8ddb8c');
-        break;
-      case 'agent_card':
-        if (msg.stage === 'result' && msg.text) this.setTicker(`秘书：${msg.text.slice(0, 80)}`, '#d8dee6');
         break;
     }
   }
@@ -188,7 +162,7 @@ class OfficeScene extends Phaser.Scene {
 
   update() {
     // 闲逛
-    if (!this.mainTarget && !this.resting && this.time.now >= this.nextWanderAt) {
+    if (!this.mainTarget && this.time.now >= this.nextWanderAt) {
       const spot = HOTSPOTS[Phaser.Math.Between(0, HOTSPOTS.length - 1)];
       this.mainTarget = {
         x: Phaser.Math.Clamp(spot.x + Phaser.Math.Between(-16, 16), WALK_BOUNDS.minX, WALK_BOUNDS.maxX),
@@ -215,16 +189,10 @@ class OfficeScene extends Phaser.Scene {
     }
     if (!moving) {
       this.char.setVelocity(0, 0);
-      if (this.resting) this.char.anims.play('type', true);
-      else {
-        this.char.anims.stop();
-        this.char.setFrame(IDLE_FRAME[this.char.getData('dir') || 'down']);
-      }
+      this.char.anims.stop();
+      this.char.setFrame(IDLE_FRAME[this.char.getData('dir') || 'down']);
     }
     this.char.setDepth(Math.round(this.char.y));
-    if (this.bubble.visible) {
-      this.bubble.setPosition(Math.round(this.char.x), Math.round(this.char.y) - this.char.displayHeight - 2);
-    }
   }
 }
 

@@ -10,6 +10,7 @@ import { GameState, loadNumbers } from './game/state.js';
 import { PushServer } from './push/ws-server.js';
 import { startRepl } from './agent/repl.js';
 import type { ToolContext } from './agent/tools.js';
+import type { GameEvent } from './shared/types.js';
 
 /**
  * 像素办公室后端入口（P2：本地服务 + WS 推送 + 数值结算）。
@@ -46,6 +47,109 @@ async function main(): Promise<void> {
   };
   game.onStateChange = () => push?.broadcastState();
 
+  // ---------- 会话注册表：消息面板的数据源 ----------
+  interface ConvInfo {
+    id: string;
+    kind: 'group' | 'o2o';
+    title: string;
+    openId?: string;
+    lastTs: number;
+    count: number;
+  }
+  const convs = new Map<string, ConvInfo>();
+  const msgBuffer = new Map<string, Array<{ sender: string; text: string; ts: number }>>();
+
+  const pickField = (obj: unknown, keys: string[]): unknown => {
+    if (!obj || typeof obj !== 'object') return undefined;
+    for (const k of keys) {
+      const v = (obj as Record<string, unknown>)[k];
+      if (v != null && v !== '') return v;
+    }
+    return undefined;
+  };
+  const findArr = (obj: unknown): unknown[] | null => {
+    if (Array.isArray(obj)) return obj;
+    if (obj && typeof obj === 'object') {
+      for (const k of ['items', 'list', 'messages', 'records', 'result', 'data']) {
+        const v = (obj as Record<string, unknown>)[k];
+        if (Array.isArray(v)) return v;
+        if (v && typeof v === 'object') {
+          const inner = findArr(v);
+          if (inner) return inner;
+        }
+      }
+    }
+    return null;
+  };
+
+  const getConversations = () =>
+    [...convs.values()]
+      .sort((a, b) => b.lastTs - a.lastTs)
+      .map((c) => ({ id: c.id, kind: c.kind, title: c.title, count: c.count }));
+
+  async function resolveConvTitle(conv: ConvInfo): Promise<void> {
+    try {
+      const res = await dwsJson<unknown>(cfg.dwsBin, ['chat', 'conversation-info', '--group', conv.id]);
+      const title =
+        pickField(res, ['title', 'name', 'conversationTitle']) ??
+        pickField(pickField(res, ['result']), ['title', 'name', 'conversationTitle']);
+      if (title) conv.title = String(title);
+    } catch {
+      /* 保留默认标题 */
+    }
+    push?.broadcast({ type: 'conversations', items: getConversations() });
+  }
+
+  function trackConversation(ev: GameEvent): void {
+    if (!ev.conversationId) return;
+    const isO2O = ev.type === 'o2o_msg';
+    let conv = convs.get(ev.conversationId);
+    if (!conv) {
+      conv = {
+        id: ev.conversationId,
+        kind: isO2O ? 'o2o' : 'group',
+        title: isO2O ? `单聊·${ev.sender ?? '?'}` : `群·${ev.conversationId.slice(-6)}`,
+        openId: ev.senderOpenId,
+        lastTs: ev.ts,
+        count: 0,
+      };
+      convs.set(conv.id, conv);
+      msgBuffer.set(conv.id, []);
+      if (!isO2O) void resolveConvTitle(conv);
+      push?.broadcast({ type: 'conversations', items: getConversations() });
+    }
+    conv.lastTs = ev.ts;
+    conv.count += 1;
+    const buf = msgBuffer.get(conv.id);
+    if (buf) {
+      buf.push({ sender: ev.sender ?? '?', text: (ev.text ?? '').slice(0, 300), ts: ev.ts });
+      if (buf.length > 200) buf.shift();
+    }
+  }
+
+  async function fetchMessages(convId: string): Promise<Array<{ sender: string; text: string; ts: string | number }>> {
+    const conv = convs.get(convId);
+    if (!conv) return [];
+    const from = new Date(Date.now() - 8 * 3600 * 1000);
+    const p2 = (n: number) => String(n).padStart(2, '0');
+    const timeStr = `${from.getFullYear()}-${p2(from.getMonth() + 1)}-${p2(from.getDate())} ${p2(from.getHours())}:${p2(from.getMinutes())}:${p2(from.getSeconds())}`;
+    const args = ['chat', 'message', 'list', '--time', timeStr, '--direction', 'newer', '--limit', '60'];
+    if (conv.kind === 'group') args.push('--group', conv.id);
+    else if (conv.openId) args.push('--open-dingtalk-id', conv.openId);
+    else return msgBuffer.get(convId) ?? [];
+    try {
+      const res = await dwsJson<unknown>(cfg.dwsBin, args);
+      const arr = findArr(res) ?? [];
+      return arr.map((m) => ({
+        sender: String(pickField(m, ['senderNick', 'sender', 'senderName', 'nick']) ?? '?'),
+        text: String(pickField(m, ['content', 'text']) ?? ''),
+        ts: String(pickField(m, ['createTime', 'create_time', 'sendTime']) ?? ''),
+      }));
+    } catch {
+      return msgBuffer.get(convId) ?? [];
+    }
+  }
+
   // ---------- 展示通道：IM 事件 ----------
   const seen = new Map<string, { type: string; ts: number }>(); // messageId 去重（group_all 与 at 重叠）
   const onImEvent = (raw: unknown): void => {
@@ -63,6 +167,7 @@ async function main(): Promise<void> {
       }
     }
     store.insertEvent(ev.id, ev.ts, ev.type, raw);
+    trackConversation(ev);
     const text = (ev.text ?? '').replace(/\n/g, ' ').slice(0, 60);
     log('im', `${ev.type} | ${ev.sender ?? '?'}${ev.conversationId ? ` @${ev.conversationId.slice(0, 14)}…` : ''}: ${text}`);
     // 数值影响（深夜消息、@打断/压力等）——只做数值，绝不触发操作
@@ -111,6 +216,7 @@ async function main(): Promise<void> {
     poller,
     store,
     moodTier: () => game.moodTierName(),
+    listConversations: () => getConversations(),
     onAction: (ev) => {
       const notes = game.applyAction(ev);
       log('game', `结算 ${ev.kind}：${notes.join('；') || '无数值变化'}`);
@@ -119,7 +225,7 @@ async function main(): Promise<void> {
 
   // ---------- 推送层：WS + debug 页 ----------
   push = new PushServer(
-    { cfg, game, poller, toolCtx: ctx, debugHtmlPath: resolve(cfg.rootDir, 'public/debug.html') },
+    { cfg, game, poller, toolCtx: ctx, debugHtmlPath: resolve(cfg.rootDir, 'public/debug.html'), getConversations, fetchMessages },
     cfg.wsPort,
   );
   push.broadcastState();

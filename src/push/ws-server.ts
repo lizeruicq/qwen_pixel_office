@@ -24,6 +24,8 @@ export interface PushDeps {
   poller: TodoPoller;
   toolCtx: ToolContext;
   debugHtmlPath: string;
+  getConversations: () => unknown[];
+  fetchMessages: (convId: string) => Promise<unknown[]>;
 }
 
 const CONFIRM_TIMEOUT_MS = 5 * 60_000;
@@ -113,18 +115,24 @@ export class PushServer {
     }
     const { game, toolCtx, cfg } = this.deps;
     try {
+      if (msg.type === 'panel') {
+        const m = msg as { type: 'panel'; name?: string; convId?: string };
+        if (m.name === 'conversations') {
+          this.send(ws, { type: 'conversations', items: this.deps.getConversations() });
+        } else if (m.name === 'messages') {
+          const items = await this.deps.fetchMessages(String(m.convId ?? ''));
+          this.send(ws, { type: 'messages', convId: m.convId, items });
+        } else if (m.name === 'todos') {
+          this.broadcastTodos();
+        }
+        return;
+      }
       if (msg.type === 'confirm') {
         const resolver = this.pending.get(msg.requestId);
         if (resolver) resolver(Boolean(msg.approved));
         return;
       }
       if (msg.type === 'action') {
-        if (msg.name === 'rest_start' || msg.name === 'rest_stop') {
-          const text = msg.name === 'rest_start' ? game.startRest() : game.stopRest();
-          this.send(ws, { type: 'agent_card', stage: 'result', text });
-          this.broadcastState();
-          return;
-        }
         const result = await executeTool(msg.name, msg.params ?? {}, toolCtx, this.wsDriver(ws));
         this.send(ws, { type: 'agent_card', stage: 'result', tool: msg.name, text: `[${result.status}] ${result.text}` });
         this.broadcastState();

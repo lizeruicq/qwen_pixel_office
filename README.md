@@ -33,17 +33,16 @@ export PIXEL_WS_PORT=8787                 # 可选
 | 自然语言 | 交给 AI 秘书（需 LLM Key），如「回复产品群：收到」 |
 | `/todos` | 查看未完成待办 |
 | `/state` | 查看四属性快照 |
-| `/rest` | 开始/结束休息（能量+心情加速恢复） |
 | `/call <工具> <json>` | 直接调用工具，如 `/call complete_todo {"subject":"周报"}` |
 | `/help` / `/quit` | 帮助 / 退出 |
 
-可用工具：`list_todos`、`complete_todo`、`send_group_message`、`send_o2o_message`、`summarize_conversation`、`create_todo`。
+可用工具：`list_todos`、`complete_todo`、`comment_todo`、`send_group_message`、`send_o2o_message`、`summarize_conversation`、`create_todo`、`list_conversations`。
 
 ## WebSocket 协议（P2）
 
-server→client：`hello` / `state`（四属性快照）/ `game_event`（消息与待办变化）/ `todos` / `agent_card`（草稿/结果卡片）/ `notice`（升级、档位变化等）。
+server→client：`hello` / `state`（四属性快照）/ `game_event`（消息与待办变化）/ `todos` / `conversations` / `messages` / `agent_card`（草稿/结果卡片）/ `notice`（升级、档位变化等）。
 
-client→server：`action`（执行工具或 `rest_start`/`rest_stop`）、`confirm`（按 `requestId` 回复草稿确认）、`agent_chat`（自然语言）。
+client→server：`action`（执行工具）、`confirm`（按 `requestId` 回复草稿确认）、`agent_chat`（自然语言）、`panel`（请求 conversations/messages/todos）。
 
 调试页提供属性条、待办列表、动作按钮、AI 输入框、草稿确认卡片与事件流，供 P3 前端开发前联调。
 
@@ -61,9 +60,11 @@ npm install
 npm run dev        # http://127.0.0.1:5173
 ```
 
-先在 server 目录 `npm start`，前端自动连接 `ws://localhost:8787`：DOM HUD 显示真实四属性，底部跑马灯滚动钉钉事件；后端未启动时降级为纯场景演示并自动重连。
+先在 server 目录 `npm start`，前端自动连接 `ws://localhost:8787`：像素风 HUD 显示真实四属性（能量/心情自动缓慢恢复，无休息操作）；后端未启动时降级为纯场景演示并自动重连。
 
-场景为俯视角星露谷风单房间（22×14 tile，16px）：`tileset.png` 烘焙地板/墙/夜景窗/海报/挂钟，物件（书桌/转椅/看板/沙发/圆桌角/咖啡机/冰箱/零食架/书架/绿植/滑板车/懒人沙发等 20 件）走对象层 y-sort + 碰撞 footprint，小人为四向行走 spritesheet（点击地板移动、随机漫步、休息时走到沙发播放敲键盘动画并冒气泡），另含光晕与浮尘氛围。布局在 `client/src/config/scene.js`：未来商店购买家具 = 往 `OBJECTS` 追加条目；预留位数据在同文件 `RESERVED_SLOTS`，场景中不渲染任何标记。
+场景为俯视角星露谷风单房间（22×14 tile，16px）：`tileset.png` 烘焙地板/墙/夜景窗/海报/挂钟，物件（双屏工位×4/并排看板×2/大屏/沙发/圆桌角/咖啡机/冰箱/书架/绿植等 20 余件）走对象层 y-sort + 碰撞 footprint，小人为四向行走 spritesheet（点击地板移动、随机漫步），另含光晕与浮尘氛围。布局在 `client/src/config/scene.js`：未来商店购买家具 = 往 `OBJECTS` 追加条目；预留位数据在同文件 `RESERVED_SLOTS`，场景中不渲染任何标记。
+
+**交互面板**（像素风右侧抽屉，四 tab）：点击电脑工位 →「消息」（会话列表从钉钉事件自动积累、群名异步解析；选中会话拉最近 8 小时历史 + 实时增量；会话绑定的 AI 快捷：总结本群/起草回复；回复输入走草稿确认）；点击左白板 →「待办」（卡片按优先级着色，完成/评论走通用草稿确认条）；点击大显示屏 →「事件」（独立事件流：IM 事件/待办变化/通知/AI 活动）；点击右白板 →「秘书」（全局指令中心：查看/处理/新建待办、最近会话 + 自由对话，需 LLM Key）。所有写操作的草稿确认条在抽屉级通用展示。
 
 **素材生成管线**：`client/tools/generate.py`（拷自参考项目，纯标准库）输出全部像素素材到 `client/public/assets/`——tileset、34 种物件、角色/NPC 图集、光晕、浮尘。改美术只需编辑该脚本后 `python3 client/tools/generate.py` 重新生成（确定性种子 42）。
 

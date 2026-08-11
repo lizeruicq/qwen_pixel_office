@@ -89,6 +89,7 @@ export const OBJECTS = [
   { key: 'plant_small', x: 30, y: 92 },
   { key: 'scooter', x: 26, y: 140 },
   { key: 'kanban', x: 44, y: 204 },
+  { key: 'kanban', x: 80, y: 204 },
 ];
 
 /** 碰撞 footprint（来自参考项目） */
@@ -136,6 +137,17 @@ export const RESERVED_SLOTS = [
 
 export const WALK_BOUNDS = { minX: 24, maxX: 340, minY: 56, maxY: 200 };
 export const SPAWN = { x: 170, y: 150 };
+
+/** 点击触发面板的物件区域（中心 x / 底边 y / 宽 / 高） */
+export const PANEL_TRIGGERS = [
+  { tab: 'events', x: 84, y: 80, w: 52, h: 36 }, // 大显示屏 → 事件流
+  { tab: 'messages', x: 60, y: 110, w: 44, h: 34 }, // 电脑工位 1
+  { tab: 'messages', x: 108, y: 110, w: 44, h: 34 }, // 电脑工位 2
+  { tab: 'messages', x: 60, y: 152, w: 44, h: 34 }, // 电脑工位 3
+  { tab: 'messages', x: 108, y: 152, w: 44, h: 34 }, // 电脑工位 4
+  { tab: 'tasks', x: 44, y: 204, w: 36, h: 34 }, // 左白板 → 待办
+  { tab: 'secretary', x: 80, y: 204, w: 36, h: 34 }, // 右白板 → 秘书
+];
 
 /** 光晕：[x, y, warm|cool] */
 export const GLOWS = [

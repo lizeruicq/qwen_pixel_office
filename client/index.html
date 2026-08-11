@@ -8,40 +8,141 @@
     html, body { margin: 0; padding: 0; height: 100%; background: #10131a; overflow: hidden; }
     #game { width: 100vw; height: 100vh; }
     canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
-    #hud, #ticker {
-      position: fixed; left: 0; right: 0; z-index: 10;
-      font-family: ui-monospace, "SF Mono", Menlo, monospace;
-      color: #d8dee6; pointer-events: none;
+
+    /* ---------- 像素风通用 ---------- */
+    :root {
+      --px-border: #5e3a1e;
+      --px-border-dark: #2a1a0e;
+      --px-border-light: #8d5f33;
+      --px-bg: #1a1626;
+      --px-panel: #20242c;
+      --px-ink: #d8dee6;
+      --px-dim: #8b949e;
     }
+    .pixel-frame {
+      background: var(--px-bg);
+      border: 4px solid var(--px-border);
+      box-shadow: 0 0 0 4px var(--px-border-dark), inset 0 0 0 4px var(--px-border-light);
+      position: relative;
+    }
+    .pixel-frame::after {
+      content: ''; position: absolute; inset: 4px; pointer-events: none;
+      background:
+        repeating-linear-gradient(0deg, transparent 0 3px, rgba(255,255,255,.025) 3px 4px),
+        repeating-linear-gradient(90deg, transparent 0 3px, rgba(255,255,255,.025) 3px 4px);
+    }
+    button {
+      font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+      color: var(--px-ink); background: #2a2e38; cursor: pointer;
+      border: 2px solid #0b0d10; border-radius: 0;
+      box-shadow: inset -2px -2px 0 rgba(0,0,0,.45), inset 2px 2px 0 rgba(255,255,255,.14);
+      padding: 5px 10px;
+    }
+    button:active { box-shadow: inset 2px 2px 0 rgba(0,0,0,.45); }
+    button.primary { background: #316dca; }
+    input {
+      font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+      background: #14161a; color: var(--px-ink); border: 2px solid #0b0d10; border-radius: 0;
+      box-shadow: inset 2px 2px 0 rgba(0,0,0,.5); padding: 6px 8px;
+    }
+    .dim { color: var(--px-dim); }
+    .scroll { overflow-y: auto; }
+    [hidden] { display: none !important; }
+
+    /* ---------- HUD ---------- */
     #hud {
-      top: 12px; left: 12px; right: auto; width: 250px;
-      background: rgba(16, 19, 26, .85); border: 1px solid #2a2e38;
-      border-radius: 8px; padding: 10px 12px; font-size: 12px;
+      position: fixed; top: 12px; left: 12px; z-index: 10; width: 262px;
+      padding: 12px 14px; font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+      color: var(--px-ink); pointer-events: none;
     }
     #hud .bar { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
-    #hud .lbl { width: 26px; color: #8b949e; }
-    #hud .track { flex: 1; height: 8px; background: #2a2e38; border-radius: 4px; overflow: hidden; }
-    #hud .fill { height: 100%; border-radius: 4px; transition: width .4s; }
+    #hud .lbl { width: 26px; color: var(--px-dim); }
+    #hud .track { flex: 1; height: 10px; background: #2a2e38; border: 2px solid #0b0d10; }
+    #hud .fill { height: 100%; transition: width .4s; }
     #f-energy { background: #eac54f; } #f-mood { background: #f47067; } #f-focus { background: #6cb6ff; }
     #hud .val { width: 58px; text-align: right; color: #adbac7; }
-    #meta { margin-top: 6px; color: #8b949e; }
+    #meta { margin-top: 6px; color: var(--px-dim); }
     #meta b { color: #eac54f; }
-    #ticker {
-      bottom: 0; height: 28px; line-height: 28px; padding: 0 14px;
-      background: rgba(11, 13, 16, .92); font-size: 12px; color: #8b949e;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+
+    /* ---------- 抽屉 ---------- */
+    #drawer {
+      position: fixed; top: 12px; right: 12px; bottom: 12px; width: 420px; z-index: 20;
+      display: flex; flex-direction: column; overflow: hidden;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; color: var(--px-ink);
+      transition: transform .25s ease;
     }
+    #drawer.closed { transform: translateX(calc(100% + 32px)); }
+    #drawer-tabs { display: flex; gap: 4px; padding: 10px 10px 8px; }
+    #drawer-tabs button { color: var(--px-dim); background: #241d30; }
+    #drawer-tabs button.active { background: #316dca; color: #fff; }
+    #drawer-close { margin-left: auto; }
+    #draft-bar {
+      margin: 0 10px 8px; padding: 8px; background: #2a2416; border: 2px solid #eac54f;
+      display: flex; flex-direction: column; gap: 6px; z-index: 2;
+    }
+    #draft-text { white-space: pre-wrap; color: #eac54f; }
+    .pane { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0 10px 10px; z-index: 1; }
+    .chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0; }
+    .chips button { font-size: 11px; padding: 3px 8px; background: #241d30; color: #b39ddb; }
+    #conv-list { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0; max-height: 76px; overflow-y: auto; }
+    .conv { font-size: 11px; padding: 3px 8px; background: var(--px-panel); color: #adbac7; }
+    .conv.active { background: #4a3b12; color: #eac54f; border-color: #eac54f; }
+    #ai-line { padding: 4px 2px; min-height: 16px; color: #b39ddb; white-space: pre-wrap; }
+    #msg-list, #event-list, #sec-log, #task-list { flex: 1; padding: 6px 2px; }
+    .msg, .ev { margin: 0 0 6px; line-height: 1.5; word-break: break-all; }
+    .msg .who { color: #6cb6ff; margin-right: 6px; }
+    .ev .t { color: var(--px-dim); margin-right: 6px; font-size: 10px; }
+    .ev .k { display: inline-block; margin-right: 6px; padding: 0 4px; font-size: 10px; background: #241d30; }
+    .k.at_me { background: #5c1f24; color: #f47067; }
+    .k.group_msg, .k.o2o_msg { background: #1f3d5c; color: #6cb6ff; }
+    .k.todo_added, .k.todo_done, .k.todo_near_due, .k.todo_overdue { background: #43341c; color: #eac54f; }
+    .k.notice { background: #1f4326; color: #8ddb8c; }
+    .k.ai { background: #35265c; color: #b39ddb; }
+    .row { display: flex; gap: 6px; padding-top: 8px; }
+    .row input { flex: 1; }
+    .task { background: var(--px-panel); border: 2px solid #0b0d10; border-left: 6px solid #fff; padding: 8px; margin-bottom: 8px; box-shadow: inset -2px -2px 0 rgba(0,0,0,.35); }
+    .t-sub { margin-bottom: 4px; }
+    .t-meta { font-size: 11px; margin-bottom: 6px; color: var(--px-dim); }
+    .t-ops button { margin-right: 6px; }
   </style>
 </head>
 <body>
   <div id="game"></div>
-  <div id="hud">
+  <div id="hud" class="pixel-frame">
     <div class="bar"><span class="lbl">能量</span><div class="track"><div class="fill" id="f-energy"></div></div><span class="val" id="v-energy">-</span></div>
     <div class="bar"><span class="lbl">心情</span><div class="track"><div class="fill" id="f-mood"></div></div><span class="val" id="v-mood">-</span></div>
     <div class="bar"><span class="lbl">专注</span><div class="track"><div class="fill" id="f-focus"></div></div><span class="val" id="v-focus">-</span></div>
-    <div id="meta">金币 <b id="v-coins">0</b> ｜ Lv<span id="v-level">1</span> ｜ <span id="v-tier">开心</span><span id="v-rest"></span><span id="v-off"></span></div>
+    <div id="meta">金币 <b id="v-coins">0</b> ｜ Lv<span id="v-level">1</span> ｜ <span id="v-tier">开心</span><span id="v-off"></span></div>
   </div>
-  <div id="ticker">像素办公室已就绪。点击地板让小人走动。</div>
+  <div id="drawer" class="pixel-frame closed">
+    <div id="drawer-tabs">
+      <button data-tab="messages">消息</button>
+      <button data-tab="tasks">待办</button>
+      <button data-tab="events">事件</button>
+      <button data-tab="secretary">秘书</button>
+      <button id="drawer-close">✕</button>
+    </div>
+    <div id="draft-bar" hidden><span id="draft-text"></span><span><button id="draft-ok" class="primary">确认</button> <button id="draft-no">取消</button></span></div>
+    <div id="pane-messages" class="pane">
+      <div id="conv-list"></div>
+      <div id="msg-quick" class="chips"></div>
+      <div id="ai-line" class="dim"></div>
+      <div id="msg-list" class="scroll"></div>
+      <div class="row"><input id="msg-input" placeholder="回复当前会话…（Enter 发送）" /><button id="msg-send" class="primary">发送</button></div>
+    </div>
+    <div id="pane-tasks" class="pane" hidden>
+      <div id="task-list" class="scroll"></div>
+      <div class="row"><button id="task-refresh">刷新</button></div>
+    </div>
+    <div id="pane-events" class="pane" hidden>
+      <div id="event-list" class="scroll"></div>
+    </div>
+    <div id="pane-secretary" class="pane" hidden>
+      <div id="sec-quick" class="chips"></div>
+      <div id="sec-log" class="scroll"></div>
+      <div class="row"><input id="sec-input" placeholder="给秘书下指令…（Enter 发送）" /><button id="sec-send" class="primary">发送</button></div>
+    </div>
+  </div>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

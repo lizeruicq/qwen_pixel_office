@@ -19,7 +19,6 @@ function printHelp(write: (s: string) => void): void {
       '命令:',
       '  /todos                    查看未完成待办',
       '  /state                    查看四属性快照',
-      '  /rest                     开始/结束休息（能量+心情加速恢复）',
       '  /call <工具名> <json参数>  直接调用工具（无需 LLM），如:',
       '                            /call list_todos {}',
       '                            /call send_group_message {"group":"测试","text":"hello"}',
@@ -76,7 +75,7 @@ export function startRepl(cfg: AppConfig, ctx: ToolContext, game: GameState, onQ
     write(
       [
         `能量 ${s.energy}/${s.energyCap} ｜ 心情 ${s.mood}（${s.moodTier}）｜ 专注 ${s.focus}`,
-        `金币 ${s.coins} ｜ Lv${s.level}（XP ${s.xp}）｜ 今日完成 ${s.completedToday} ｜ ${s.resting ? '休息中' : '工作中'}`,
+        `金币 ${s.coins} ｜ Lv${s.level}（XP ${s.xp}）｜ 今日完成 ${s.completedToday}`,
       ].join('\n'),
     );
   }
@@ -98,10 +97,6 @@ export function startRepl(cfg: AppConfig, ctx: ToolContext, game: GameState, onQ
     }
     if (line === '/state') {
       printState();
-      return;
-    }
-    if (line === '/rest') {
-      write(game.snapshot().resting ? game.stopRest() : game.startRest());
       return;
     }
     if (line.startsWith('/call ')) {
