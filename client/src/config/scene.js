@@ -33,16 +33,15 @@ export function floorLayout() {
     for (let c = 0; c < MAP.cols; c++) {
       let t;
       if (r === 0) t = c === 0 || c === MAP.cols - 1 ? T.SAND : c === 10 ? T.ACCENT : c % 5 === 0 ? T.SAND : T.CITYWIN;
-      else if (r === MAP.rows - 1) t = T.GRASS;
+      else if (r === MAP.rows - 1) t = c === 10 || c === 11 ? T.MAT : T.MARB; // 底行：大理石，中间入口
       else if (c === 0) {
         if (r === 2) t = T.POST1;
         else if (r === 4) t = T.POST2;
-        else t = r <= 5 ? T.SAND : T.GRASS;
-      } else if (c === MAP.cols - 1) t = T.GLASS;
+        else t = T.SAND; // 左墙统一用沙色墙
+      } else if (c === MAP.cols - 1) t = T.SAND; // 右墙统一用沙色墙
       else if (c >= 19 && r >= 4 && r <= 7) t = T.MARB; // 水吧区大理石
       else if (c >= 16 && r >= 8) t = (c === 17 || c === 18) && (r === 11 || r === 12) ? T.RUG : T.CARPET;
       else if (c === 15 && r >= 8) t = T.WOODV;
-      else if ((c === 9 || c === 10) && r === 12) t = T.MAT; // 入口门垫
       else t = T.WOOD;
       row.push(t);
     }
