@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>像素办公室</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #10131a; overflow: hidden; }
+    #game { width: 100vw; height: 100vh; }
+    canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+    #hud, #ticker {
+      position: fixed; left: 0; right: 0; z-index: 10;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      color: #d8dee6; pointer-events: none;
+    }
+    #hud {
+      top: 12px; left: 12px; right: auto; width: 250px;
+      background: rgba(16, 19, 26, .85); border: 1px solid #2a2e38;
+      border-radius: 8px; padding: 10px 12px; font-size: 12px;
+    }
+    #hud .bar { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+    #hud .lbl { width: 26px; color: #8b949e; }
+    #hud .track { flex: 1; height: 8px; background: #2a2e38; border-radius: 4px; overflow: hidden; }
+    #hud .fill { height: 100%; border-radius: 4px; transition: width .4s; }
+    #f-energy { background: #eac54f; } #f-mood { background: #f47067; } #f-focus { background: #6cb6ff; }
+    #hud .val { width: 58px; text-align: right; color: #adbac7; }
+    #meta { margin-top: 6px; color: #8b949e; }
+    #meta b { color: #eac54f; }
+    #ticker {
+      bottom: 0; height: 28px; line-height: 28px; padding: 0 14px;
+      background: rgba(11, 13, 16, .92); font-size: 12px; color: #8b949e;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+  </style>
+</head>
+<body>
+  <div id="game"></div>
+  <div id="hud">
+    <div class="bar"><span class="lbl">能量</span><div class="track"><div class="fill" id="f-energy"></div></div><span class="val" id="v-energy">-</span></div>
+    <div class="bar"><span class="lbl">心情</span><div class="track"><div class="fill" id="f-mood"></div></div><span class="val" id="v-mood">-</span></div>
+    <div class="bar"><span class="lbl">专注</span><div class="track"><div class="fill" id="f-focus"></div></div><span class="val" id="v-focus">-</span></div>
+    <div id="meta">金币 <b id="v-coins">0</b> ｜ Lv<span id="v-level">1</span> ｜ <span id="v-tier">开心</span><span id="v-rest"></span><span id="v-off"></span></div>
+  </div>
+  <div id="ticker">像素办公室已就绪。点击地板让小人走动。</div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

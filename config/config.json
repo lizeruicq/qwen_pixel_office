@@ -4,8 +4,8 @@
   "todoPageSize": 50,
   "wsPort": 8787,
   "llm": {
-    "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    "model": "qwen-plus",
+    "baseUrl": "https://ark.cn-beijing.volces.com/api/coding/v3",
+    "model": "ark-code-latest",
     "apiKeyEnv": ["PIXEL_LLM_API_KEY", "DASHSCOPE_API_KEY"]
   }
 }

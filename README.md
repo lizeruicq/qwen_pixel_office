@@ -53,6 +53,20 @@ client→server：`action`（执行工具或 `rest_start`/`rest_stop`）、`conf
 node scripts/ws-smoke-test.mjs
 ```
 
+## 前端（P3 进行中）
+
+```bash
+cd client
+npm install
+npm run dev        # http://127.0.0.1:5173
+```
+
+先在 server 目录 `npm start`，前端自动连接 `ws://localhost:8787`：DOM HUD 显示真实四属性，底部跑马灯滚动钉钉事件；后端未启动时降级为纯场景演示并自动重连。
+
+场景为俯视角星露谷风单房间（22×14 tile，16px）：`tileset.png` 烘焙地板/墙/夜景窗/海报/挂钟，物件（书桌/转椅/看板/沙发/圆桌角/咖啡机/冰箱/零食架/书架/绿植/滑板车/懒人沙发等 20 件）走对象层 y-sort + 碰撞 footprint，小人为四向行走 spritesheet（点击地板移动、随机漫步、休息时走到沙发播放敲键盘动画并冒气泡），另含光晕与浮尘氛围。布局在 `client/src/config/scene.js`：未来商店购买家具 = 往 `OBJECTS` 追加条目；预留位数据在同文件 `RESERVED_SLOTS`，场景中不渲染任何标记。
+
+**素材生成管线**：`client/tools/generate.py`（拷自参考项目，纯标准库）输出全部像素素材到 `client/public/assets/`——tileset、34 种物件、角色/NPC 图集、光晕、浮尘。改美术只需编辑该脚本后 `python3 client/tools/generate.py` 重新生成（确定性种子 42）。
+
 ## 游戏数值
 
 数值全部外置在 `config/numbers.json`（设计文档第 6 章）。核心规则：
