@@ -17,6 +17,7 @@ import { executeTool, type ConfirmDriver } from '../agent/executor.js';
 import { runAgentFlow } from '../agent/agent-flow.js';
 import { log } from '../log.js';
 import type { ClientMessage } from '../shared/types.js';
+import type { Clock } from '../game/clock.js';
 
 export interface PushDeps {
   cfg: AppConfig;
@@ -24,6 +25,7 @@ export interface PushDeps {
   poller: TodoPoller;
   toolCtx: ToolContext;
   debugHtmlPath: string;
+  clock: Clock;
   getConversations: () => unknown[];
   fetchMessages: (convId: string) => Promise<unknown[]>;
 }
@@ -33,6 +35,8 @@ const CONFIRM_TIMEOUT_MS = 5 * 60_000;
 export class PushServer {
   private clients = new Set<WebSocket>();
   private pending = new Map<string, (approved: boolean) => void>();
+  /** 每个连接当前正在运行的 AI 流程的中断器 */
+  private agentAborters = new Map<WebSocket, AbortController>();
   private server: http.Server;
 
   constructor(
@@ -55,10 +59,15 @@ export class PushServer {
       this.send(ws, { type: 'hello', ts: Date.now() });
       this.send(ws, { type: 'state', state: this.deps.game.snapshot() });
       this.send(ws, { type: 'todos', items: this.deps.poller.list() });
+      this.sendTime(ws);
       ws.on('message', (data) => {
         void this.handleMessage(ws, data.toString());
       });
-      ws.on('close', () => this.clients.delete(ws));
+      ws.on('close', () => {
+        this.clients.delete(ws);
+        this.agentAborters.get(ws)?.abort();
+        this.agentAborters.delete(ws);
+      });
       log('ws', `客户端连接，当前 ${this.clients.size} 个`);
     });
     this.server.listen(port, () => {
@@ -79,6 +88,19 @@ export class PushServer {
 
   broadcastTodos(): void {
     this.broadcast({ type: 'todos', items: this.deps.poller.list() });
+  }
+
+  private timeMsg(): { type: 'time'; mode: 'natural' | 'manual'; now: number; phase: string; ts: number } {
+    const s = this.deps.clock.snapshot();
+    return { type: 'time', mode: s.mode, now: s.now, phase: s.phase, ts: Date.now() };
+  }
+
+  private sendTime(ws: WebSocket): void {
+    this.send(ws, this.timeMsg());
+  }
+
+  broadcastTime(): void {
+    this.broadcast(this.timeMsg());
   }
 
   private send(ws: WebSocket, msg: unknown): void {
@@ -115,6 +137,18 @@ export class PushServer {
     }
     const { game, toolCtx, cfg } = this.deps;
     try {
+      if (msg.type === 'set_time') {
+        const m = msg as { type: 'set_time'; mode: 'natural' | 'manual'; ms?: number };
+        if (m.mode === 'manual' && typeof m.ms === 'number' && Number.isFinite(m.ms)) {
+          this.deps.clock.useManual(m.ms);
+          log('clock', `切到人工时间：${new Date(m.ms).toLocaleString('zh-CN')}`);
+        } else {
+          this.deps.clock.useNatural();
+          log('clock', '切回自然时间');
+        }
+        this.broadcastTime();
+        return;
+      }
       if (msg.type === 'panel') {
         const m = msg as { type: 'panel'; name?: string; convId?: string };
         if (m.name === 'conversations') {
@@ -138,11 +172,36 @@ export class PushServer {
         this.broadcastState();
         return;
       }
+      if (msg.type === 'agent_cancel') {
+        this.agentAborters.get(ws)?.abort();
+        return;
+      }
+      if (msg.type === 'adjust_stat') {
+        const m = msg as { type: 'adjust_stat'; stat: 'energy' | 'mood' | 'focus' | 'coins'; delta: number };
+        const allowed = ['energy', 'mood', 'focus', 'coins'];
+        if (allowed.includes(m.stat) && typeof m.delta === 'number') {
+          game.adjustStat(m.stat, m.delta); // changed() → onStateChange → broadcastState()
+          log('debug', `调整属性 ${m.stat} ${m.delta > 0 ? '+' : ''}${m.delta}`);
+        }
+        return;
+      }
       if (msg.type === 'agent_chat') {
-        await runAgentFlow(String(msg.text ?? ''), cfg, toolCtx, this.wsDriver(ws), {
-          text: (t) => this.send(ws, { type: 'agent_card', stage: 'result', text: t }),
-          toolStart: (name, args) => this.send(ws, { type: 'agent_card', stage: 'tool', tool: name, text: JSON.stringify(args) }),
-        });
+        // 若已有在跑的流程，先中断再开新的（防御；正常前端会在思考中锁定输入）
+        this.agentAborters.get(ws)?.abort();
+        const aborter = new AbortController();
+        this.agentAborters.set(ws, aborter);
+        try {
+          await runAgentFlow(String(msg.text ?? ''), cfg, toolCtx, this.wsDriver(ws), {
+            text: (t) => this.send(ws, { type: 'agent_card', stage: 'result', text: t }),
+            toolStart: (name, args) => this.send(ws, { type: 'agent_card', stage: 'tool', tool: name, text: JSON.stringify(args) }),
+          }, aborter.signal);
+        } finally {
+          // 仅当本次仍是当前流程时才清理并通知解锁
+          if (this.agentAborters.get(ws) === aborter) {
+            this.agentAborters.delete(ws);
+            this.send(ws, { type: 'agent_card', stage: 'done' });
+          }
+        }
         this.broadcastState();
       }
     } catch (e) {

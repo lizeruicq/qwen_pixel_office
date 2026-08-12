@@ -61,12 +61,19 @@
     </div>
     <div class="kv">心情档位：<span class="tier" id="v-tier">-</span>　<span class="dim" id="v-rest"></span></div>
     <button id="btn-rest">开始休息</button>
+    <h2 style="margin-top:16px">时钟</h2>
+    <div class="kv">当前：<b id="v-clock-now">-</b>　<span class="dim" id="v-clock-phase"></span>　<span class="dim" id="v-clock-mode"></span></div>
+    <button id="btn-natural">使用自然时间</button>
+    <div style="margin-top:6px">
+      <input id="manual-dt" type="datetime-local" step="60">
+      <button class="primary" id="btn-manual">设为人工时间</button>
+    </div>
     <h2 style="margin-top:16px">操作</h2>
     <button onclick="act('list_todos')">看待办</button>
     <button onclick="completeTodo()">完成待办</button>
     <button onclick="createTodo()">新建待办</button>
     <button onclick="sendGroup()">发群消息</button>
-    <h2 style="margin-top:16px">AI 秘书</h2>
+    <h2 style="margin-top:16px">AI 千仔</h2>
     <input id="chat" placeholder="自然语言指令（需配置 LLM）" onkeydown="if(event.key==='Enter')chat()">
     <button class="primary" onclick="chat()">发送</button>
     <h2 style="margin-top:16px">卡片</h2>
@@ -74,6 +81,18 @@
   </section>
 
   <section>
+    <h2>调整属性</h2>
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">
+      <select id="adj-stat" style="flex:1;background:#14161a;border:1px solid #3d4451;color:#d8dee6;border-radius:6px;padding:6px 8px;font-family:inherit;font-size:12px">
+        <option value="energy">能量</option>
+        <option value="mood">心情</option>
+        <option value="focus">专注</option>
+        <option value="coins">金币</option>
+      </select>
+      <input id="adj-delta" type="number" value="10" style="width:80px" placeholder="数值">
+      <button class="primary" id="adj-add">＋加</button>
+      <button class="danger" id="adj-sub">－减</button>
+    </div>
     <h2>待办列表</h2>
     <ul id="todos"><li class="dim">等待数据…</li></ul>
   </section>
@@ -102,7 +121,14 @@ function route(msg) {
     case 'game_event': addEvent(msg); break;
     case 'agent_card': addCard(msg); break;
     case 'notice': addEvent({ kind: 'notice', payload: { text: msg.text }, ts: msg.ts }); break;
+    case 'time': renderClock(msg); break;
   }
+}
+
+function renderClock(msg) {
+  $('v-clock-now').textContent = new Date(msg.now).toLocaleString('zh-CN', { hour12: false });
+  $('v-clock-phase').textContent = msg.phase;
+  $('v-clock-mode').textContent = msg.mode === 'manual' ? '（人工）' : '（自然）';
 }
 
 function renderState() {
@@ -185,6 +211,21 @@ function sendGroup() {
   act('send_group_message', { group: g, text: t });
 }
 $('btn-rest').onclick = () => { act(state && state.resting ? 'rest_stop' : 'rest_start'); };
+$('btn-natural').onclick = () => send({ type: 'set_time', mode: 'natural' });
+function adjust(sign) {
+  const stat = $('adj-stat').value;
+  const v = Number($('adj-delta').value);
+  if (!Number.isFinite(v) || v <= 0) return;
+  send({ type: 'adjust_stat', stat, delta: sign * v });
+}
+$('adj-add').onclick = () => adjust(1);
+$('adj-sub').onclick = () => adjust(-1);
+$('btn-manual').onclick = () => {
+  const v = $('manual-dt').value; // "YYYY-MM-DDTHH:mm"
+  if (!v) return;
+  const ms = new Date(v).getTime();
+  if (Number.isFinite(ms)) send({ type: 'set_time', mode: 'manual', ms });
+};
 connect();
 </script>
 </body>

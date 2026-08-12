@@ -175,12 +175,53 @@ class OfficeScene extends Phaser.Scene {
     this.panels?.handleWs(msg);
     switch (msg.type) {
       case 'state':
+        this.floatDelta(msg.state);
         this.state = msg.state;
         this.renderHud();
         break;
       case 'todos':
         this.todoCount = msg.items.length;
         break;
+      case 'time':
+        this.clockInfo = { now: msg.now, phase: msg.phase, mode: msg.mode, at: performance.now() };
+        this.renderClock();
+        break;
+    }
+  }
+
+  /* 时间组件：服务端每 5s 广播基准，期间本地插值让秒针平滑 */
+  renderClock() {
+    const c = this.clockInfo;
+    if (!c) return;
+    const cur = c.now + (performance.now() - c.at);
+    const d = new Date(cur);
+    const p = (n) => String(n).padStart(2, '0');
+    const clockEl = $('v-clock');
+    const phaseEl = $('v-phase');
+    if (clockEl) clockEl.textContent = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    if (phaseEl) {
+      phaseEl.textContent = c.phase;
+      phaseEl.className = `phase-${c.phase}`;
+    }
+    const modeEl = $('v-clock-mode');
+    if (modeEl) modeEl.textContent = c.mode === 'manual' ? '⏱人工' : '';
+  }
+
+  /* 对比上一帧 state，属性变化时在 HUD 对应行飘出数字（增=红，减=灰） */
+  floatDelta(next) {
+    const prev = this.state;
+    if (!prev) return;
+    const keys = ['energy', 'mood', 'focus', 'coins'];
+    for (const key of keys) {
+      const d = next[key] - prev[key];
+      if (!d || Math.abs(d) < 0.05) continue;
+      // 能量/心情/专注定位到各自 bar；金币等定位到 meta 行
+      const host = $(`f-${key}`)?.closest('.bar') || $('meta') || $('hud');
+      const el = document.createElement('span');
+      el.className = `float-num ${d > 0 ? 'up' : 'down'}`;
+      el.textContent = `${d > 0 ? '+' : ''}${Math.round(d * 10) / 10}`;
+      host.appendChild(el);
+      setTimeout(() => el.remove(), 1300);
     }
   }
 
@@ -194,6 +235,12 @@ class OfficeScene extends Phaser.Scene {
         x: Phaser.Math.Clamp(spot.x + Phaser.Math.Between(-16, 16), WALK_BOUNDS.minX, WALK_BOUNDS.maxX),
         y: Phaser.Math.Clamp(spot.y + Phaser.Math.Between(-8, 8), WALK_BOUNDS.minY, WALK_BOUNDS.maxY),
       };
+    }
+
+    // 时钟每秒本地插值刷新一次
+    if (!this._clockTickAt || this.time.now - this._clockTickAt >= 1000) {
+      this._clockTickAt = this.time.now;
+      this.renderClock();
     }
 
     let moving = false;

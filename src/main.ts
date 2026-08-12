@@ -7,6 +7,7 @@ import { normalizeImEvent } from './bridge/normalize.js';
 import { TodoPoller } from './bridge/todo-poller.js';
 import { dwsJson } from './bridge/dws-exec.js';
 import { GameState, loadNumbers } from './game/state.js';
+import { Clock } from './game/clock.js';
 import { PushServer } from './push/ws-server.js';
 import { startRepl } from './agent/repl.js';
 import type { ToolContext } from './agent/tools.js';
@@ -39,7 +40,8 @@ async function main(): Promise<void> {
 
   // ---------- 游戏逻辑层 ----------
   const numbers = loadNumbers(cfg.rootDir);
-  const game = new GameState(numbers, store);
+  const clock = new Clock(store);
+  const game = new GameState(numbers, store, () => clock.now());
   let push: PushServer | undefined;
   game.onNotice = (text) => {
     log('game', text);
@@ -247,7 +249,7 @@ async function main(): Promise<void> {
 
   // ---------- 推送层：WS + debug 页 ----------
   push = new PushServer(
-    { cfg, game, poller, toolCtx: ctx, debugHtmlPath: resolve(cfg.rootDir, 'public/debug.html'), getConversations, fetchMessages },
+    { cfg, game, poller, toolCtx: ctx, debugHtmlPath: resolve(cfg.rootDir, 'public/debug.html'), clock, getConversations, fetchMessages },
     cfg.wsPort,
   );
   push.broadcastState();
@@ -257,12 +259,18 @@ async function main(): Promise<void> {
     game.tick(Date.now(), poller.list());
   }, 60_000);
 
+  // 时间组件心跳：每 5 秒广播一次当前时钟（驱动前端时间/五阶段展示）
+  const timeTimer = setInterval(() => {
+    push?.broadcastTime();
+  }, 5_000);
+
   let shuttingDown = false;
   const shutdown = (): void => {
     if (shuttingDown) return;
     shuttingDown = true;
     log('main', '正在退出：停止 consume 订阅、轮询与 WS…');
     clearInterval(tickTimer);
+    clearInterval(timeTimer);
     for (const c of consumes) c.stop();
     poller.stop();
     push?.close();

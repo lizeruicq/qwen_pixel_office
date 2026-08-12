@@ -71,17 +71,21 @@ export type ServerMessage =
   | { type: 'messages'; convId: string; items: Array<{ sender: string; text: string; ts: string | number }> }
   | {
       type: 'agent_card';
-      stage: 'draft' | 'tool' | 'result';
+      stage: 'draft' | 'tool' | 'result' | 'done';
       requestId?: string;
       tool?: string;
       preview?: string;
       text?: string;
     }
-  | { type: 'notice'; text: string; ts: number };
+  | { type: 'notice'; text: string; ts: number }
+  | { type: 'time'; mode: 'natural' | 'manual'; now: number; phase: string; ts: number };
 
 /** client→server 请求消息 */
 export type ClientMessage =
   | { type: 'action'; name: string; params?: Record<string, unknown> }
   | { type: 'confirm'; requestId: string; approved: boolean }
   | { type: 'panel'; name: 'conversations' | 'messages' | 'todos'; convId?: string }
-  | { type: 'agent_chat'; text: string };
+  | { type: 'agent_chat'; text: string }
+  | { type: 'agent_cancel' }
+  | { type: 'set_time'; mode: 'natural' | 'manual'; ms?: number }
+  | { type: 'adjust_stat'; stat: 'energy' | 'mood' | 'focus' | 'coins'; delta: number };

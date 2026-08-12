@@ -1,5 +1,5 @@
 {
-  "dwsBin": "xxx/bin/dws",
+  "dwsBin": "/Users/zeruili/.qwenworkcn/bin/dws",
   "pollIntervalSec": 120,
   "todoPageSize": 50,
   "wsPort": 8787,

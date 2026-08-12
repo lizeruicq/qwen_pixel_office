@@ -115,9 +115,11 @@ export class GameState {
   constructor(
     private numbers: Numbers,
     private store: Store,
+    /** 语义时间源（人工/自然时钟）：仅用于"看小时/看日期"（深夜时段、每日重置）。速率类逻辑仍用真实 Date.now() */
+    private semanticNow: () => number = Date.now,
   ) {
     this.p = this.load();
-    this.checkDailyReset(Date.now());
+    this.checkDailyReset();
   }
 
   private defaults(): PersistShape {
@@ -129,7 +131,7 @@ export class GameState {
       coins: i.coins,
       xp: i.xp,
       level: i.level,
-      date: this.todayStr(Date.now()),
+      date: this.todayStr(this.semanticNow()),
       completedToday: 0,
       dailyEarn: {},
       dailyStartAwarded: false,
@@ -166,8 +168,9 @@ export class GameState {
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   }
 
-  private checkDailyReset(now: number): void {
-    const today = this.todayStr(now);
+  private checkDailyReset(): void {
+    // 每日重置跟随语义时钟（人工时间也可触发"新的一天"）
+    const today = this.todayStr(this.semanticNow());
     if (this.p.date === today) return;
     this.p.date = today;
     this.p.completedToday = 0;
@@ -230,7 +233,7 @@ export class GameState {
   /* ---------- 操作通道入口：玩家做了事 ---------- */
 
   applyAction(ev: ActionEvent, now = Date.now()): string[] {
-    this.checkDailyReset(now);
+    this.checkDailyReset();
     const notes: string[] = [];
     this.lastActionTs = now;
     this.lastInteractionTs = now;
@@ -294,7 +297,7 @@ export class GameState {
   /* ---------- 展示通道入口：钉钉事件只影响数值，绝不触发操作 ---------- */
 
   onImEvent(ev: GameEvent, now = Date.now()): string[] {
-    this.checkDailyReset(now);
+    this.checkDailyReset();
     const notes: string[] = [];
     this.lastInteractionTs = now;
     const m = this.numbers.mood;
@@ -305,7 +308,7 @@ export class GameState {
       arr.push(now);
       this.groupMsgTimes.set(ev.conversationId, arr);
 
-      const h = new Date(now).getHours();
+      const h = new Date(this.semanticNow()).getHours();
       const ln = m.lateNight;
       if (h >= ln.startHour || h < ln.endHour) {
         this.lateNightTimes = this.lateNightTimes.filter((t) => now - t < 3_600_000);
@@ -339,7 +342,7 @@ export class GameState {
 
   /** 钉钉侧直接完成的待办也结算奖励（原则二：忙碌不是惩罚），但不耗能量 */
   onTodoDelta(d: TodoDelta, now = Date.now()): string[] {
-    this.checkDailyReset(now);
+    this.checkDailyReset();
     this.lastInteractionTs = now;
     if (d.kind !== 'done') return [];
     const pr = String(d.item.priority);
@@ -354,7 +357,7 @@ export class GameState {
 
   /** 待办出现时一次性扣心情：≤阈值每条 -newTodoMoodCost，超过阈值每条 -newTodoMoodCostOver（按加入后的未完成总数定档） */
   onTodoAdded(openCount: number, now = Date.now()): string[] {
-    this.checkDailyReset(now);
+    this.checkDailyReset();
     this.lastInteractionTs = now;
     const m = this.numbers.mood;
     const cost = openCount > m.newTodoMoodCostOverThreshold ? m.newTodoMoodCostOver : m.newTodoMoodCost;
@@ -364,7 +367,7 @@ export class GameState {
   }
 
   checkAllClear(todos: TodoItem[], now = Date.now()): string[] {
-    this.checkDailyReset(now);
+    this.checkDailyReset();
     if (todos.length === 0 && this.p.completedToday > 0 && !this.p.allClearAwarded) {
       this.p.allClearAwarded = true;
       this.p.coins += this.numbers.coins.allClear;
@@ -379,7 +382,7 @@ export class GameState {
   /* ---------- 每分钟结算 ---------- */
 
   tick(now: number, todos: TodoItem[]): void {
-    this.checkDailyReset(now);
+    this.checkDailyReset();
     const prevTier = this.moodTier().name;
     const rg = this.numbers.energy.regen;
 
@@ -417,6 +420,26 @@ export class GameState {
     this.changed();
     const tier = this.moodTier().name;
     if (tier !== prevTier) this.notice(`心情档位变化：${prevTier} → ${tier}`);
+  }
+
+  /** 调试：直接增减单条属性（能量/心情/专注/金币），带边界钳制 */
+  adjustStat(stat: 'energy' | 'mood' | 'focus' | 'coins', delta: number): void {
+    if (!Number.isFinite(delta) || delta === 0) return;
+    switch (stat) {
+      case 'energy':
+        this.p.energy = Math.max(0, Math.min(this.energyCap(), this.p.energy + delta));
+        break;
+      case 'mood':
+        this.p.mood = this.clampMood(this.p.mood + delta);
+        break;
+      case 'focus':
+        this.p.focus = Math.max(0, Math.min(100, this.p.focus + delta));
+        break;
+      case 'coins':
+        this.p.coins = Math.max(0, this.p.coins + delta);
+        break;
+    }
+    this.changed();
   }
 
   snapshot(): StateSnapshot {

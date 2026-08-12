@@ -1,5 +1,5 @@
 /**
- * AI 秘书对话循环（function calling）：REPL 与 WebSocket 共用。
+ * 千仔 AI 对话循环（function calling）：REPL 与 WebSocket 共用。
  * 输出经 AgentSink 适配到终端或 WS 卡片；确认经 ConfirmDriver 适配。
  */
 import type { AppConfig } from '../config.js';
@@ -20,20 +20,30 @@ export async function runAgentFlow(
   ctx: ToolContext,
   driver: ConfirmDriver,
   sink: AgentSink,
+  signal?: AbortSignal,
 ): Promise<void> {
   if (!cfg.llm.enabled) {
     sink.text('LLM 未配置：请设置环境变量 PIXEL_LLM_API_KEY（或 DASHSCOPE_API_KEY）。');
     return;
   }
+  const aborted = () => signal?.aborted === true;
   const messages: ChatMessage[] = [
     { role: 'system', content: SYSTEM_PROMPT },
     { role: 'user', content: wrapPlayerInput(input) },
   ];
   for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+    if (aborted()) {
+      sink.text('（已取消）');
+      return;
+    }
     let resp: { content: string | null; toolCalls: ToolCall[] };
     try {
-      resp = await chatOnce(cfg.llm, messages, openAiToolSchemas());
+      resp = await chatOnce(cfg.llm, messages, openAiToolSchemas(), signal);
     } catch (e) {
+      if (aborted()) {
+        sink.text('（已取消）');
+        return;
+      }
       sink.text(`LLM 调用失败: ${String(e)}`);
       return;
     }
@@ -43,6 +53,10 @@ export async function runAgentFlow(
     }
     messages.push({ role: 'assistant', content: resp.content ?? '', tool_calls: resp.toolCalls });
     for (const tc of resp.toolCalls) {
+      if (aborted()) {
+        sink.text('（已取消）');
+        return;
+      }
       let args: Record<string, unknown> = {};
       try {
         args = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};

@@ -24,7 +24,7 @@ function printHelp(write: (s: string) => void): void {
       '                            /call send_group_message {"group":"测试","text":"hello"}',
       '  /help                     显示帮助',
       '  /quit                     退出',
-      '其他输入将交给 AI 秘书（需配置 LLM API Key）。',
+      '其他输入将交给 AI 助手千仔（需配置 LLM API Key）。',
     ].join('\n'),
   );
 }
@@ -141,7 +141,7 @@ export function startRepl(cfg: AppConfig, ctx: ToolContext, game: GameState, onQ
     if (!rlClosed) rl.prompt();
   }
 
-  write('像素办公室后端已启动。/help 查看命令；自然语言将交给 AI 秘书。');
+  write('像素办公室后端已启动。/help 查看命令；自然语言将交给 AI 助手千仔。');
   rl.setPrompt('pixel-office> ');
   rl.prompt();
 

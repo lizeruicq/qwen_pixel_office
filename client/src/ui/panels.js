@@ -1,9 +1,9 @@
 /**
- * 右侧抽屉：消息 / 待办 / 事件 / 秘书 四面板。
+ * 右侧抽屉：消息 / 待办 / 事件 / 千仔 四面板。
  * - 消息：会话列表 + 历史/实时 + 快捷 AI 指令 + 回复（草稿确认）
  * - 待办：卡片 + 完成/评论（草稿确认条在抽屉级，任何工具通用）
  * - 事件：独立事件流（IM 事件 / 待办变化 / 通知 / AI 活动）
- * - 秘书：AI 对话 + 快捷指令（agent_chat）
+ * - 千仔：AI 对话 + 快捷指令（agent_chat）
  */
 export function initPanels(socket) {
   const $ = (id) => document.getElementById(id);
@@ -117,7 +117,7 @@ export function initPanels(socket) {
 
   const aiChat = (text) => {
     socket.send({ type: 'agent_chat', text });
-    addEvent('ai', `你 → 秘书：${text}`);
+    addEvent('ai', `你 → 千仔：${text}`);
   };
 
   $('msg-quick').innerHTML = ['总结本群', '起草回复']
@@ -149,26 +149,52 @@ export function initPanels(socket) {
     b.onclick = () => aiChat(SEC_QUICK[Number(b.dataset.i)][1]);
   }
 
+  /* ---------- 千仔：思考中锁定 / 取消中断 ---------- */
+  let secBusy = false;
+
+  function setSecBusy(v) {
+    secBusy = v;
+    const input = $('sec-input');
+    const btn = $('sec-send');
+    input.disabled = v;
+    input.placeholder = v ? '千仔正在思考中…' : '让千仔来帮忙…（Enter 发送）';
+    btn.textContent = v ? '取消' : '发送';
+    btn.classList.toggle('primary', !v);
+  }
+
   function sendSec() {
     const el = $('sec-input');
     const text = el.value.trim();
     if (!text) return;
+    addChatRow('me', text);
     aiChat(text);
     el.value = '';
+    setSecBusy(true);
   }
-  $('sec-send').onclick = sendSec;
+  $('sec-send').onclick = () => {
+    if (secBusy) {
+      socket.send({ type: 'agent_cancel' });
+      // 不等后端回包，立即解锁（后端 done 到达时再确保一次）
+      setSecBusy(false);
+      addChatRow('qz', '（已取消）', true);
+    } else {
+      sendSec();
+    }
+  };
   $('sec-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') sendSec();
+    if (e.key === 'Enter' && !secBusy) sendSec();
   });
 
-  function addSecLine(kind, text) {
+  /* 千仔聊天窗气泡：who = 'me' | 'qz' */
+  function addChatRow(who, text, dimm = false) {
     const log = $('sec-log');
-    const div = document.createElement('div');
-    div.className = 'msg';
-    div.innerHTML = `<span class="ev"><span class="t">${now()}</span><span class="k ai">${kind}</span>${esc(text)}</span>`;
-    log.appendChild(div);
+    const row = document.createElement('div');
+    row.className = `chat-row ${who}`;
+    const label = who === 'me' ? '我' : '千仔';
+    row.innerHTML = `<div class="avatar ${who}"></div><div class="bubble">${dimm ? '<span class="dim">' : ''}${esc(text)}${dimm ? '</span>' : ''}</div>`;
+    log.appendChild(row);
     log.scrollTop = log.scrollHeight;
-    $('ai-line').textContent = `${kind}：${text}`;
+    if (who === 'qz') $('ai-line').textContent = `千仔：${text}`;
   }
 
   /* ---------- 待办面板 ---------- */
@@ -255,9 +281,12 @@ export function initPanels(socket) {
         if (msg.stage === 'draft') {
           showDraft(msg.requestId, msg.preview);
         } else if (msg.stage === 'tool') {
-          addSecLine('tool', `${msg.tool} ${msg.text ?? ''}`);
+          addChatRow('qz', `🔧 ${msg.tool} ${msg.text ?? ''}`, true);
         } else if (msg.stage === 'result') {
-          addSecLine('ai', msg.text ?? '');
+          addChatRow('qz', msg.text ?? '');
+          setSecBusy(false);
+        } else if (msg.stage === 'done') {
+          setSecBusy(false);
         }
         break;
     }
