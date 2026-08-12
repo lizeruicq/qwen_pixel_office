@@ -16,7 +16,7 @@ export interface ExecResult {
   text: string;
 }
 
-export const AUTOMATION_TOOLS = ['summarize_conversation', 'create_todo'];
+export const AUTOMATION_TOOLS = ['summarize_conversation', 'create_todo', 'create_doc', 'submit_report'];
 
 export async function executeTool(
   name: string,

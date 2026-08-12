@@ -141,12 +141,21 @@ export function initPanels(socket) {
   const SEC_QUICK = [
     ['查看待办', '查看我的待办'],
     ['处理待办', '帮我处理第一条未完成待办'],
-    ['新建待办', '帮我新建一条待办'],
-    ['最近会话', '列出最近会话'],
+    ['新建待办', '帮我新建一条待办：'],
+    ['读文档', '帮我读一下这篇文档的内容并总结：'],
+    ['写文档', '帮我新建一篇文档，标题是「」，内容是：'],
+    ['写日报', '帮我写今天的日报，今天主要做了：'],
   ];
   $('sec-quick').innerHTML = SEC_QUICK.map(([label], i) => `<button data-i="${i}">${label}</button>`).join('');
   for (const b of $('sec-quick').querySelectorAll('button')) {
-    b.onclick = () => aiChat(SEC_QUICK[Number(b.dataset.i)][1]);
+    b.onclick = () => {
+      if (secBusy) return; // 思考中不覆盖输入
+      const el = $('sec-input');
+      el.value = SEC_QUICK[Number(b.dataset.i)][1];
+      el.focus();
+      // 光标移到末尾，方便接着补内容
+      el.setSelectionRange(el.value.length, el.value.length);
+    };
   }
 
   /* ---------- 千仔：思考中锁定 / 取消中断 ---------- */
