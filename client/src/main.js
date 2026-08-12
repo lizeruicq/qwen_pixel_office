@@ -4,6 +4,7 @@ import {
 } from './config/scene.js';
 import { GameSocket } from './net/ws.js';
 import { initPanels } from './ui/panels.js';
+import { confirmPanel, rpgDialog } from './ui/dialogs.js';
 
 const W = MAP.cols * TILE; // 352
 const H = MAP.rows * TILE; // 224
@@ -163,9 +164,6 @@ class OfficeScene extends Phaser.Scene {
 
     // ---------- 打卡机 ----------
     this.punchPending = false;
-    $('punch-no').onclick = () => this.closePunch();
-    $('punch-yes').onclick = () => this.doPunch();
-    $('rpg-box').onclick = () => { $('rpg-box').hidden = true; };
   }
 
   /* ---------- 打卡 ---------- */
@@ -184,34 +182,23 @@ class OfficeScene extends Phaser.Scene {
     return null;
   }
 
-  openPunch() {
+  /* 走到打卡机前后调用：确认面板 → 是 → RPG 结果对话框 */
+  async tryPunch() {
     const w = this.punchWindow();
-    const text = $('punch-text');
-    if (w === 'in') text.textContent = '要打卡上班吗？';
-    else if (w === 'out') text.textContent = '要打卡下班吗？';
-    else text.textContent = '现在不是打卡时间。';
-    $('punch-yes').style.display = w ? '' : 'none';
-    $('punch-panel').hidden = false;
-  }
-
-  closePunch() {
-    $('punch-panel').hidden = true;
-  }
-
-  doPunch() {
-    const w = this.punchWindow();
-    this.closePunch();
-    if (!w) return;
-    const portrait = $('rpg-portrait');
-    const text = $('rpg-text');
-    if (w === 'in') {
-      portrait.src = '/assets/portrait_happy.png';
-      text.textContent = '打卡成功，开始一天的工作！';
-    } else {
-      portrait.src = '/assets/portrait_normal.png';
-      text.textContent = '打卡下班，总觉得还有些事没做完…';
+    if (!w) {
+      await rpgDialog({ portrait: '/assets/portrait_normal.png', text: '现在不是打卡时间。' });
+      return;
     }
-    $('rpg-box').hidden = false;
+    const yes = await confirmPanel({
+      image: '/assets/objects/time_clock.png',
+      text: w === 'in' ? '要打卡上班吗？' : '要打卡下班吗？',
+    });
+    if (!yes) return;
+    if (w === 'in') {
+      await rpgDialog({ portrait: '/assets/portrait_happy.png', text: '打卡成功，开始一天的工作！' });
+    } else {
+      await rpgDialog({ portrait: '/assets/portrait_normal.png', text: '打卡下班，总觉得还有些事没做完…' });
+    }
   }
 
   /* ---------- UI ---------- */
@@ -311,10 +298,10 @@ class OfficeScene extends Phaser.Scene {
         this.char.setVelocity(0, 0);
         this.mainTarget = null;
         this.nextWanderAt = this.time.now + 4000 + Math.random() * 5000;
-        // 走到打卡机前了 → 打开打卡面板
+        // 走到打卡机前了 → 打开打卡流程
         if (this.punchPending) {
           this.punchPending = false;
-          this.openPunch();
+          void this.tryPunch();
         }
       } else {
         this.char.setVelocity((dx / dist) * SPEED, (dy / dist) * SPEED);

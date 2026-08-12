@@ -103,7 +103,7 @@
   </section>
 </main>
 <script>
-let ws, state = null;
+let ws, state = null, lastClock = null;
 const $ = (id) => document.getElementById(id);
 const tierClass = (t) => 'tier tier-' + t;
 
@@ -126,6 +126,7 @@ function route(msg) {
 }
 
 function renderClock(msg) {
+  lastClock = msg;
   $('v-clock-now').textContent = new Date(msg.now).toLocaleString('zh-CN', { hour12: false });
   $('v-clock-phase').textContent = msg.phase;
   $('v-clock-mode').textContent = msg.mode === 'manual' ? '（人工）' : '（自然）';
@@ -222,9 +223,9 @@ $('adj-add').onclick = () => adjust(1);
 $('adj-sub').onclick = () => adjust(-1);
 $('btn-manual').onclick = () => {
   const v = $('manual-dt').value; // "YYYY-MM-DDTHH:mm"
-  if (!v) return;
+  if (!v) { $('v-clock-mode').textContent = '（请先选择日期时间）'; return; }
   const ms = new Date(v).getTime();
-  if (Number.isFinite(ms)) send({ type: 'set_time', mode: 'manual', ms });
+  if (Number.isFinite(ms)) { send({ type: 'set_time', mode: 'manual', ms }); $('v-clock-mode').textContent = '（已发送…）'; }
 };
 connect();
 </script>

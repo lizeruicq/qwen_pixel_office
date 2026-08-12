@@ -146,31 +146,6 @@
     .chat-row.qz .bubble { background: #35265c; color: #e3d8ff; }
     .bubble .dim { font-size: 10px; }
     .task { background: var(--px-panel); border: 2px solid #0b0d10; border-left: 6px solid #fff; padding: 8px; margin-bottom: 8px; box-shadow: inset -2px -2px 0 rgba(0,0,0,.35); }
-
-    /* ---------- 打卡面板 ---------- */
-    #punch-panel {
-      position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
-      z-index: 40; width: 240px; padding: 18px 16px; text-align: center;
-      font-family: ui-monospace, Menlo, monospace; color: var(--px-ink);
-    }
-    #punch-img { width: 72px; height: 96px; image-rendering: pixelated; display: block; margin: 0 auto 10px; }
-    #punch-text { font-size: 14px; margin-bottom: 14px; }
-    #punch-btns button { margin: 0 6px; padding: 6px 18px; font-size: 13px; }
-
-    /* ---------- RPG 对话框 ---------- */
-    #rpg-box {
-      position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
-      z-index: 40; width: min(520px, 92vw); padding: 12px 14px;
-      display: flex; align-items: center; gap: 12px; cursor: pointer;
-      font-family: ui-monospace, Menlo, monospace; color: var(--px-ink);
-    }
-    #rpg-portrait {
-      width: 64px; height: 64px; flex: 0 0 64px; image-rendering: pixelated;
-      border: 2px solid #0b0d10; background: #2a2e38;
-    }
-    #rpg-text { font-size: 14px; line-height: 1.6; flex: 1; }
-    #rpg-text::after { content: ' ▼'; color: var(--px-dim); animation: blink 1s steps(2) infinite; }
-    @keyframes blink { 50% { opacity: 0; } }
     .t-sub { margin-bottom: 4px; }
     .t-meta { font-size: 11px; margin-bottom: 6px; color: var(--px-dim); }
     .t-ops button { margin-right: 6px; }
@@ -178,22 +153,6 @@
 </head>
 <body>
   <div id="game"></div>
-
-  <!-- 打卡确认面板（屏幕中央） -->
-  <div id="punch-panel" class="pixel-frame" hidden>
-    <img id="punch-img" src="/assets/objects/time_clock.png" alt="打卡机" />
-    <div id="punch-text">要打卡上班吗？</div>
-    <div id="punch-btns">
-      <button id="punch-yes" class="primary">是的</button>
-      <button id="punch-no">不是</button>
-    </div>
-  </div>
-
-  <!-- RPG 结果对话框（底部） -->
-  <div id="rpg-box" class="pixel-frame" hidden>
-    <img id="rpg-portrait" src="/assets/portrait_happy.png" alt="" />
-    <div id="rpg-text">打卡成功，开始一天的工作！</div>
-  </div>
 
   <div id="hud" class="pixel-frame">
     <div class="bar"><span class="lbl">能量</span><div class="track"><div class="fill" id="f-energy"></div></div><span class="val" id="v-energy">-</span></div>
