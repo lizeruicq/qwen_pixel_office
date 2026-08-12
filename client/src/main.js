@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import {
   TILE, MAP, T, floorLayout, OBJECTS, FOOTPRINTS, HOTSPOTS, WALK_BOUNDS, SPAWN, GLOWS, PANEL_TRIGGERS, TIME_CLOCK,
-  COFFEE_MACHINE, SEATS, WORKERS,
+  COFFEE_MACHINE, SEATS, WORKERS, SKY_STATES, PHASE_TO_SKY, SKY,
 } from './config/scene.js';
 import { GameSocket } from './net/ws.js';
 import { initPanels } from './ui/panels.js';
@@ -51,11 +51,17 @@ class OfficeScene extends Phaser.Scene {
     for (let r = 0; r < MAP.rows; r++) {
       for (let c = 0; c < MAP.cols; c++) {
         const t = layout[r][c];
+        if (t < 0) continue; // 留空（顶部窗区由窗外景层绘制）
         ctx.drawImage(src, (t % 8) * TILE, Math.floor(t / 8) * TILE, TILE, TILE, c * TILE, r * TILE, TILE, TILE);
       }
     }
     canvas.refresh();
     this.add.image(0, 0, 'floor').setOrigin(0, 0).setDepth(0);
+
+    // ---------- 窗外景：叠在整面顶窗上，按时段切 4 种天色 ----------
+    this.buildSky();
+    this.skyImg = this.add.image(SKY.x, SKY.y, 'sky').setOrigin(0, 0).setDepth(0.6);
+    this.setSky('forenoon'); // 默认白天，时钟广播到达后按真实时段覆盖
 
     // ---------- 光晕 ----------
     for (const [gx, gy, kind] of GLOWS) {
@@ -238,6 +244,61 @@ class OfficeScene extends Phaser.Scene {
 
   /* ---------- 打卡 ---------- */
 
+  /* 烘焙窗外景画布骨架（只建纹理，实际像素在 setSky 里按时段重绘）。高 1.5 行（24px） */
+  buildSky() {
+    const cv = this.textures.createCanvas('sky', SKY.w, SKY.h);
+    cv.refresh();
+  }
+
+  /* 按窗外景状态重绘整面窗（只动窗外 canvas，不改室内色调）。每次清画布重画，避免叠色 */
+  setSky(stateKey) {
+    const st = SKY_STATES[stateKey];
+    if (!st || !this.skyImg) return;
+    const cv = this.textures.get('sky');
+    const x = cv.getContext();
+    const { w: Wpx, h: Hpx } = SKY;
+    x.clearRect(0, 0, Wpx, Hpx);
+    // 天空底
+    x.fillStyle = st.sky;
+    x.fillRect(0, 0, Wpx, Hpx);
+    const night = stateKey === 'night';
+    // 云与飞鸟：白天/清晨/傍晚可见，深夜隐入夜空
+    if (!night) {
+      x.fillStyle = 'rgba(255,255,255,0.85)';
+      for (const [cx, cy, w] of [[36, 6, 20], [120, 12, 26], [208, 5, 18], [280, 14, 16]]) {
+        x.fillRect(cx, cy, w, 3);
+        x.fillRect(cx + 3, cy - 2, w - 8, 2);
+      }
+      x.fillStyle = 'rgba(40,50,70,0.7)';
+      for (const [bx, by] of [[70, 8], [78, 6], [150, 10], [232, 7], [292, 11]]) {
+        x.fillRect(bx, by, 2, 1); x.fillRect(bx + 3, by, 2, 1);
+      }
+    }
+    // 星星：深夜明显，白天淡
+    x.fillStyle = night ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.28)';
+    for (const [sx, sy] of [[30, 14], [90, 5], [135, 16], [175, 8], [215, 15], [255, 16], [298, 6], [310, 17], [55, 18]]) {
+      x.fillRect(sx, sy, 1, 1);
+    }
+    // 太阳 / 月亮
+    x.fillStyle = st.sun;
+    x.beginPath(); x.arc(262, 9, 5, 0, Math.PI * 2); x.fill();
+    // 两侧墙柱（盖住天空，露出中间窗区），与下方 SAND 墙衔接
+    x.fillStyle = '#d9c49a';
+    x.fillRect(0, 0, TILE, Hpx);
+    x.fillRect(Wpx - TILE, 0, TILE, Hpx);
+    // 墙柱描边
+    x.fillStyle = '#b39a70';
+    x.fillRect(TILE - 1, 0, 1, Hpx);
+    x.fillRect(Wpx - TILE, 0, 1, Hpx);
+    // 窗框竖梃（中间窗区每 4 列一根）+ 底窗台（在 24px 底边）
+    x.fillStyle = '#6b4a2f';
+    for (let c = 4; c < MAP.cols; c += 4) x.fillRect(c * TILE - 1, 0, 2, Hpx);
+    x.fillStyle = '#5e3a1e';
+    x.fillRect(0, Hpx - 2, Wpx, 2);
+    cv.refresh();
+    this.skyState = stateKey;
+  }
+
   /* 当前游戏内时间（毫秒），优先用时钟广播，离线退回本地 */
   gameNow() {
     return this.clockInfo ? this.clockInfo.now + (performance.now() - this.clockInfo.at) : Date.now();
@@ -365,6 +426,11 @@ class OfficeScene extends Phaser.Scene {
       case 'time':
         this.clockInfo = { now: msg.now, phase: msg.phase, mode: msg.mode, at: performance.now() };
         this.renderClock();
+        // 时段变化 → 切换窗外景（清晨/上午/傍晚/深夜，下午并入白天）
+        {
+          const sky = PHASE_TO_SKY[msg.phase] || 'forenoon';
+          if (sky !== this.skyState) this.setSky(sky);
+        }
         break;
     }
   }

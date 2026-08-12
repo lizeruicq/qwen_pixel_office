@@ -25,14 +25,14 @@ export const T = {
   ACCENT: 20, // 墙上挂钟
 };
 
-/** 22×14 房间布局 */
+/** 22×14 房间布局。顶部 1.5 行整面大落地窗（r0+r1 上半），不铺任何 tile，由窗外景层整体接管 */
 export function floorLayout() {
   const g = [];
   for (let r = 0; r < MAP.rows; r++) {
     const row = [];
     for (let c = 0; c < MAP.cols; c++) {
       let t;
-      if (r === 0) t = c === 0 || c === MAP.cols - 1 ? T.SAND : c === 10 ? T.ACCENT : c % 5 === 0 ? T.SAND : T.CITYWIN;
+      if (r === 0 || r === 1) t = -1; // 顶部 2 行：留空（含墙柱），全部由窗外景画布绘制
       else if (r === MAP.rows - 1) t = c === 10 || c === 11 ? T.MAT : T.MARB; // 底行：大理石，中间入口
       else if (c === 0) {
         if (r === 2) t = T.POST1;
@@ -49,6 +49,19 @@ export function floorLayout() {
   }
   return g;
 }
+
+/** 窗外景画布几何：覆盖整个顶部窗区（x0 起，宽 22 列, 高 2 行=32px），含两侧墙柱 */
+export const SKY = { x: 0, y: 0, w: MAP.cols * TILE, h: 32 };
+
+/** 窗外景四种状态（整面顶窗的天空色 + 太阳/月亮色，只染窗外，不改室内） */
+export const SKY_STATES = {
+  morning: { sky: 'rgba(126,178,224,1)', sun: 'rgba(255,240,200,1)' },   // 清晨：薄蓝 + 微亮
+  forenoon: { sky: 'rgba(110,168,230,1)', sun: 'rgba(255,252,235,1)' },  // 上午：明亮晴蓝
+  dusk: { sky: 'rgba(236,138,80,1)', sun: 'rgba(255,182,120,1)' },       // 傍晚：暖橙晚霞
+  night: { sky: 'rgba(18,26,52,1)', sun: 'rgba(240,244,255,1)' },        // 深夜：深蓝夜色 + 明月
+};
+/** 后端 5 时段 → 4 窗景（下午并入上午的白天） */
+export const PHASE_TO_SKY = { 清晨: 'morning', 上午: 'forenoon', 下午: 'forenoon', 傍晚: 'dusk', 深夜: 'night' };
 
 /** 物件对象层（中心 x，底边 y） */
 export const OBJECTS = [
@@ -183,5 +196,5 @@ export const GLOWS = [
   [276, 150, 'warm'],
   [330, 96, 'cool'],
   [84, 72, 'cool'],
-  [306, 40, 'warm'],
+  [306, 40, 'cool'], // 整面窗透进的冷调天光（随窗景时段再调色）
 ];
