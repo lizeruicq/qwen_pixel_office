@@ -143,10 +143,6 @@ export const SPAWN = { x: 170, y: 150 };
 /** 点击触发面板的物件区域（中心 x / 底边 y / 宽 / 高） */
 export const PANEL_TRIGGERS = [
   { tab: 'events', x: 84, y: 80, w: 52, h: 36 }, // 大显示屏 → 事件流
-  { tab: 'messages', x: 60, y: 110, w: 44, h: 34 }, // 电脑工位 1
-  { tab: 'messages', x: 108, y: 110, w: 44, h: 34 }, // 电脑工位 2
-  { tab: 'messages', x: 60, y: 152, w: 44, h: 34 }, // 电脑工位 3
-  { tab: 'messages', x: 108, y: 152, w: 44, h: 34 }, // 电脑工位 4
   { tab: 'tasks', x: 44, y: 204, w: 36, h: 34 }, // 左白板 → 待办
   { tab: 'secretary', x: 80, y: 204, w: 36, h: 34 }, // 右白板 → 秘书
 ];
@@ -156,6 +152,29 @@ export const TIME_CLOCK = {
   x: 132, y: 200, w: 24, h: 32, // 点击检测区域（中心 x / 底边 y / 宽 / 高）
   standX: 132, standY: 176,      // 玩家走到打卡机前的站立点
 };
+
+/** 咖啡机：点击区域 + 玩家站立点（咖啡机物件在 330,96，黑色 16×32）。任何时候可用 */
+export const COFFEE_MACHINE = {
+  x: 330, y: 96, w: 22, h: 34,  // 点击检测区域（中心 x / 底边 y / 宽 / 高）
+  standX: 310, standY: 112,     // 玩家走到咖啡机前的站立点
+};
+
+/**
+ * 工位（可落座）。seatX/seatY 是坐下时小人的落点（在椅子处，面向桌子）。
+ * faceDir = 坐下后面朝方向（仰脸对桌）。
+ */
+export const SEATS = [
+  { id: 'desk_tl', deskX: 60, deskY: 108, seatX: 60, seatY: 122, faceDir: 'up', worker: null },       // 左上
+  { id: 'desk_tr', deskX: 108, deskY: 108, seatX: 108, seatY: 122, faceDir: 'up', worker: null },      // 右上
+  { id: 'desk_bl', deskX: 60, deskY: 150, seatX: 60, seatY: 164, faceDir: 'up', worker: 'worker0' },  // 左下：同事0
+  { id: 'desk_br', deskX: 108, deskY: 150, seatX: 108, seatY: 164, faceDir: 'up', worker: 'worker1' },// 右下：同事1
+];
+
+/** 两名常驻同事：始终在工位打字。sprite=行走/站立表，typing=打字表，name 用于对话 */
+export const WORKERS = [
+  { id: 'worker0', name: '小蓝', seatId: 'desk_bl', sprite: 'agent0', typing: 'agent_typing0', portrait: '/assets/portrait_normal.png' },
+  { id: 'worker1', name: '小橙', seatId: 'desk_br', sprite: 'agent1', typing: 'agent_typing1', portrait: '/assets/portrait_tired.png' },
+];
 
 /** 光晕：[x, y, warm|cool] */
 export const GLOWS = [

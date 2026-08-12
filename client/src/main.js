@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
 import {
   TILE, MAP, T, floorLayout, OBJECTS, FOOTPRINTS, HOTSPOTS, WALK_BOUNDS, SPAWN, GLOWS, PANEL_TRIGGERS, TIME_CLOCK,
+  COFFEE_MACHINE, SEATS, WORKERS,
 } from './config/scene.js';
 import { GameSocket } from './net/ws.js';
 import { initPanels } from './ui/panels.js';
 import { confirmPanel, rpgDialog } from './ui/dialogs.js';
+import { createBubble } from './ui/bubble.js';
 
 const W = MAP.cols * TILE; // 352
 const H = MAP.rows * TILE; // 224
@@ -32,6 +34,11 @@ class OfficeScene extends Phaser.Scene {
     this.load.image('glow', '/assets/glow.png');
     this.load.image('glow_blue', '/assets/glow_blue.png');
     this.load.image('dust', '/assets/dust.png');
+    // 同事：行走/站立表（16×24，同 player）+ 打字表（16×24，2 帧）
+    for (const wkr of WORKERS) {
+      this.load.spritesheet(wkr.sprite, `/assets/${wkr.sprite}.png`, { frameWidth: 16, frameHeight: 24 });
+      this.load.spritesheet(wkr.typing, `/assets/${wkr.typing}.png`, { frameWidth: 16, frameHeight: 24 });
+    }
     for (const o of OBJECTS) this.load.image('obj_' + o.key, `/assets/objects/${o.key}.png`);
   }
 
@@ -87,6 +94,14 @@ class OfficeScene extends Phaser.Scene {
         frameRate: 5, repeat: -1,
       });
     }
+    // 同事打字动画（每帧 16×24，2 帧循环）
+    for (const wkr of WORKERS) {
+      this.anims.create({
+        key: 'type-' + wkr.id,
+        frames: this.anims.generateFrameNumbers(wkr.typing, { start: 0, end: 1 }),
+        frameRate: 3, repeat: -1,
+      });
+    }
 
     // ---------- 物件对象层（y-sort + 碰撞） ----------
     const furniture = this.physics.add.staticGroup();
@@ -107,6 +122,8 @@ class OfficeScene extends Phaser.Scene {
     this.char.setDepth(SPAWN.y);
     this.physics.world.setBounds(0, 0, W, H);
     this.physics.add.collider(this.char, furniture);
+    // 引用碰撞体，落座时可关闭避免卡死
+    this.charCollider = this.physics.add.collider(this.char, furniture);
 
     this.mainTarget = null;
     this.nextWanderAt = this.time.now + 3000;
@@ -117,6 +134,39 @@ class OfficeScene extends Phaser.Scene {
     this.qz.setDepth(130);
     this.qzTarget = null;
     this.qzNextWanderAt = this.time.now + 2000;
+
+    // ---------- 两名常驻同事：始终在工位打字（座椅留空让玩家可物理接近，靠点击交互） ----------
+    this.workers = [];
+    for (const cfg of WORKERS) {
+      const seat = SEATS.find((s) => s.id === cfg.seatId);
+      const spr = this.add.sprite(seat.seatX, seat.seatY, cfg.sprite).setOrigin(0.5, 1);
+      spr.setDepth(Math.round(seat.seatY));
+      spr.anims.play('type-' + cfg.id, true);
+      const bubble = createBubble();
+      this.workers.push({ cfg, seat, spr, bubble, nextChatterAt: this.time.now + 4000 + Math.random() * 6000 });
+    }
+    // 千仔气泡（紫色）
+    this.qzBubble = createBubble({ qz: true });
+
+    // ---------- 落座状态 ----------
+    this.seat = null;          // 玩家当前落座的 SEAT 项
+    this.coffeePending = false; // 走到咖啡机前后触发
+    this.chatTarget = null;    // 走到同事前后触发的闲聊对象
+
+    // 同事闲聊语料（工作吐槽 / 自我 PUA / 自我鼓励）
+    this.CHATTER = [
+      '需求又改了，第三版了…', '这周的 OKR 还没动呢', '老板说要"闭环"，啥是闭环',
+      '又加班，地铁都没了', '这 bug 我改了两天了', '我没事，我可以的',
+      '加油，打工人！', '卷赢他们，年底评个 S', '再扛一扛，发完这版就好了',
+      '我要偷偷努力，惊艳所有人', '咖啡续命中…', '这个会完全不用开',
+    ];
+    // 闲聊对话库（玩家先、同事答，两轮）
+    this.CHAT_SCRIPTS = [
+      [['在忙吗？', '嗯，需求堆成山了。'], ['需要帮忙吗？', '不用不用，我扛得住…大概。']],
+      [['吃饭了吗？', '随便对付了一口，哪有时间。'], ['别太累了', '没办法，deadline 不等人啊。']],
+      [['最近怎么样？', '老样子，白天开会晚上写码。'], ['注意身体', '等项目上线就好好休息…大概吧。']],
+      [['周末去哪玩了？', '周末？我在家补觉。'], ['太惨了吧', '习惯就好，打工人不配拥有周末。']],
+    ];
 
     // 点击地板走过去
     this.input.on('pointerdown', (p) => {
@@ -135,10 +185,30 @@ class OfficeScene extends Phaser.Scene {
       // 点击打卡机 → 玩家走到打卡机前，到位后打开打卡面板
       const tc = TIME_CLOCK;
       if (wp.x >= tc.x - tc.w / 2 && wp.x <= tc.x + tc.w / 2 && wp.y >= tc.y - tc.h && wp.y <= tc.y) {
+        this.standUp();
         this.punchPending = true;
         this.mainTarget = { x: tc.standX, y: tc.standY };
         return;
       }
+      // 点击咖啡机 → 走过去，到位后确认面板 + 聊天（任何时候可用）
+      const cm = COFFEE_MACHINE;
+      if (wp.x >= cm.x - cm.w / 2 && wp.x <= cm.x + cm.w / 2 && wp.y >= cm.y - cm.h && wp.y <= cm.y) {
+        this.standUp();
+        this.coffeePending = true;
+        this.mainTarget = { x: cm.standX, y: cm.standY };
+        return;
+      }
+      // 点击同事 → 走过去，到位后两轮闲聊
+      for (const w of this.workers) {
+        if (Math.abs(wp.x - w.spr.x) <= 12 && wp.y <= w.spr.y + 2 && wp.y >= w.spr.y - 20) {
+          this.standUp();
+          this.chatTarget = w;
+          this.mainTarget = { x: w.seat.seatX, y: w.seat.seatY + 22 };
+          return;
+        }
+      }
+      // 点击空白处 → 起身走向目标
+      this.standUp();
       this.mainTarget = {
         x: Phaser.Math.Clamp(wp.x, WALK_BOUNDS.minX, WALK_BOUNDS.maxX),
         y: Phaser.Math.Clamp(wp.y, WALK_BOUNDS.minY, WALK_BOUNDS.maxY),
@@ -201,6 +271,58 @@ class OfficeScene extends Phaser.Scene {
     }
   }
 
+  /* ---------- 喝咖啡（任何时候可用，逻辑同打卡机） ---------- */
+  async tryCoffee() {
+    const yes = await confirmPanel({
+      image: '/assets/objects/coffee_machine.png',
+      text: '要来一杯咖啡提提神吗？',
+      yesText: '来一杯', noText: '算了',
+    });
+    if (!yes) return;
+    await rpgDialog({ portrait: '/assets/portrait_happy.png', text: '咕咚咕咚……一杯美式下肚，精神多了！' });
+  }
+
+  /* ---------- 和同事闲聊（玩家先、同事答，两轮） ---------- */
+  async chatWithWorker(w) {
+    const script = this.CHAT_SCRIPTS[Phaser.Math.Between(0, this.CHAT_SCRIPTS.length - 1)];
+    const name = w.cfg.name;
+    const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+    for (const [mine, theirs] of script) {
+      await rpgDialog({ portrait: '/assets/portrait_normal.png', text: `${mine}` });
+      await pause(240);
+      await rpgDialog({ portrait: w.cfg.portrait, text: `${name}：${theirs}` });
+      await pause(240);
+    }
+  }
+
+  /* ---------- 落座 / 起身 ---------- */
+  /* 找到玩家附近的空工位并坐下（取消碰撞避免卡死） */
+  trySit() {
+    if (this.seat) return;
+    let best = null; let bestD = 18;
+    for (const s of SEATS) {
+      if (s.worker) continue;                 // 同事占着
+      if (s === this.seat) continue;
+      const d = Math.hypot(this.char.x - s.seatX, this.char.y - s.seatY);
+      if (d < bestD) { bestD = d; best = s; }
+    }
+    if (!best) return;
+    this.seat = best;
+    this.mainTarget = null;
+    this.char.setVelocity(0, 0);
+    this.char.setPosition(best.seatX, best.seatY);
+    this.char.setData('dir', best.faceDir);
+    this.char.anims.play('type', true);
+    this.char.setDepth(Math.round(best.seatY));
+    if (this.charCollider) this.charCollider.active = false; // 落座时取消碰撞
+  }
+
+  standUp() {
+    if (!this.seat) return;
+    this.seat = null;
+    if (this.charCollider) this.charCollider.active = true; // 起身恢复碰撞
+  }
+
   /* ---------- UI ---------- */
 
   renderHud() {
@@ -227,6 +349,18 @@ class OfficeScene extends Phaser.Scene {
         break;
       case 'todos':
         this.todoCount = msg.items.length;
+        this.qzBubble?.say(`你有 ${msg.items.length} 条待办`, 2800);
+        break;
+      case 'game_event': {
+        const p = msg.payload || {};
+        if (msg.kind === 'at_me') this.qzBubble?.say(`${p.sender ?? '有人'} @ 你了`, 3200);
+        else if (msg.kind === 'o2o_msg') this.qzBubble?.say(`${p.sender ?? '有人'} 私聊你`, 3200);
+        else if (msg.kind === 'group_msg') this.qzBubble?.say(`${p.sender ?? '有人'} 在群里说话`, 2600);
+        else if (msg.kind === 'todo_added') this.qzBubble?.say('你有新的待办', 2800);
+        break;
+      }
+      case 'notice':
+        this.qzBubble?.say(msg.text, 3000);
         break;
       case 'time':
         this.clockInfo = { now: msg.now, phase: msg.phase, mode: msg.mode, at: performance.now() };
@@ -274,13 +408,48 @@ class OfficeScene extends Phaser.Scene {
   /* ---------- 循环 ---------- */
 
   update(_time, delta) {
-    // 闲逛
-    if (!this.mainTarget && this.time.now >= this.nextWanderAt) {
-      const spot = HOTSPOTS[Phaser.Math.Between(0, HOTSPOTS.length - 1)];
-      this.mainTarget = {
-        x: Phaser.Math.Clamp(spot.x + Phaser.Math.Between(-16, 16), WALK_BOUNDS.minX, WALK_BOUNDS.maxX),
-        y: Phaser.Math.Clamp(spot.y + Phaser.Math.Between(-8, 8), WALK_BOUNDS.minY, WALK_BOUNDS.maxY),
-      };
+    // 落座中：持续打字，不移动，气泡跟随
+    if (this.seat) {
+      this.char.setVelocity(0, 0);
+      this.char.setDepth(Math.round(this.char.y));
+    } else {
+      // 闲逛
+      if (!this.mainTarget && this.time.now >= this.nextWanderAt) {
+        const spot = HOTSPOTS[Phaser.Math.Between(0, HOTSPOTS.length - 1)];
+        this.mainTarget = {
+          x: Phaser.Math.Clamp(spot.x + Phaser.Math.Between(-16, 16), WALK_BOUNDS.minX, WALK_BOUNDS.maxX),
+          y: Phaser.Math.Clamp(spot.y + Phaser.Math.Between(-8, 8), WALK_BOUNDS.minY, WALK_BOUNDS.maxY),
+        };
+      }
+
+      let moving = false;
+      if (this.mainTarget) {
+        const dx = this.mainTarget.x - this.char.x;
+        const dy = this.mainTarget.y - this.char.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist <= 3) {
+          this.char.setVelocity(0, 0);
+          this.mainTarget = null;
+          this.nextWanderAt = this.time.now + 4000 + Math.random() * 5000;
+          // 到位后触发待办：打卡 / 咖啡 / 闲聊
+          if (this.punchPending) { this.punchPending = false; void this.tryPunch(); }
+          else if (this.coffeePending) { this.coffeePending = false; void this.tryCoffee(); }
+          else if (this.chatTarget) { const w = this.chatTarget; this.chatTarget = null; void this.chatWithWorker(w); }
+          else this.trySit(); // 走到空工位附近则坐下
+        } else {
+          this.char.setVelocity((dx / dist) * SPEED, (dy / dist) * SPEED);
+          const nd = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : dy < 0 ? 'up' : 'down';
+          this.char.setData('dir', nd);
+          this.char.anims.play('walk-' + nd, true);
+          moving = true;
+        }
+      }
+      if (!moving) {
+        this.char.setVelocity(0, 0);
+        this.char.anims.stop();
+        this.char.setFrame(IDLE_FRAME[this.char.getData('dir') || 'down']);
+      }
+      this.char.setDepth(Math.round(this.char.y));
     }
 
     // 时钟每秒本地插值刷新一次
@@ -288,35 +457,6 @@ class OfficeScene extends Phaser.Scene {
       this._clockTickAt = this.time.now;
       this.renderClock();
     }
-
-    let moving = false;
-    if (this.mainTarget) {
-      const dx = this.mainTarget.x - this.char.x;
-      const dy = this.mainTarget.y - this.char.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist <= 3) {
-        this.char.setVelocity(0, 0);
-        this.mainTarget = null;
-        this.nextWanderAt = this.time.now + 4000 + Math.random() * 5000;
-        // 走到打卡机前了 → 打开打卡流程
-        if (this.punchPending) {
-          this.punchPending = false;
-          void this.tryPunch();
-        }
-      } else {
-        this.char.setVelocity((dx / dist) * SPEED, (dy / dist) * SPEED);
-        const nd = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : dy < 0 ? 'up' : 'down';
-        this.char.setData('dir', nd);
-        this.char.anims.play('walk-' + nd, true);
-        moving = true;
-      }
-    }
-    if (!moving) {
-      this.char.setVelocity(0, 0);
-      this.char.anims.stop();
-      this.char.setFrame(IDLE_FRAME[this.char.getData('dir') || 'down']);
-    }
-    this.char.setDepth(Math.round(this.char.y));
 
     // ---------- 千仔：自主慢速漫步（玩家不可控制） ----------
     if (!this.qzTarget && this.time.now >= this.qzNextWanderAt) {
@@ -345,6 +485,18 @@ class OfficeScene extends Phaser.Scene {
       }
     }
     this.qz.setDepth(Math.round(this.qz.y));
+
+    // ---------- 同事：随机工作吐槽气泡 + 始终打字 ----------
+    for (const w of this.workers) {
+      if (this.time.now >= w.nextChatterAt) {
+        w.nextChatterAt = this.time.now + 7000 + Math.random() * 9000;
+        if (!w.bubble.visible) {
+          w.bubble.say(this.CHATTER[Phaser.Math.Between(0, this.CHATTER.length - 1)], 3400);
+        }
+      }
+      w.bubble.follow(w.spr, this.cameras.main);
+    }
+    this.qzBubble.follow(this.qz, this.cameras.main);
   }
 }
 
