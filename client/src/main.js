@@ -9,6 +9,12 @@ const W = MAP.cols * TILE; // 352
 const H = MAP.rows * TILE; // 224
 const SPEED = 90;
 const IDLE_FRAME = { down: 0, up: 3, right: 6, left: 9 };
+const QZ_SPEED = 40; // 千仔移动更慢
+const QZ_REGIONS = [
+  { x1: 140, y1: 90, x2: 220, y2: 190 }, // 中央空地
+  { x1: 40, y1: 170, x2: 120, y2: 196 }, // 左下白板前
+  { x1: 230, y1: 150, x2: 310, y2: 196 }, // 休息区
+];
 
 const $ = (id) => document.getElementById(id);
 
@@ -21,6 +27,7 @@ class OfficeScene extends Phaser.Scene {
     this.load.image('tileset', '/assets/tileset.png');
     this.load.spritesheet('player', '/assets/player.png', { frameWidth: 16, frameHeight: 24 });
     this.load.spritesheet('player_typing', '/assets/player_typing.png', { frameWidth: 16, frameHeight: 24 });
+    this.load.spritesheet('qianzai', '/assets/qianzai.png', { frameWidth: 16, frameHeight: 16 });
     this.load.image('glow', '/assets/glow.png');
     this.load.image('glow_blue', '/assets/glow_blue.png');
     this.load.image('dust', '/assets/dust.png');
@@ -72,6 +79,13 @@ class OfficeScene extends Phaser.Scene {
       key: 'type', frames: this.anims.generateFrameNumbers('player_typing', { start: 0, end: 1 }),
       frameRate: 3, repeat: -1,
     });
+    for (let i = 0; i < dirs.length; i++) {
+      this.anims.create({
+        key: 'qz-walk-' + dirs[i],
+        frames: this.anims.generateFrameNumbers('qianzai', { frames: [i * 3, i * 3 + 1, i * 3, i * 3 + 2] }),
+        frameRate: 5, repeat: -1,
+      });
+    }
 
     // ---------- 物件对象层（y-sort + 碰撞） ----------
     const furniture = this.physics.add.staticGroup();
@@ -96,6 +110,13 @@ class OfficeScene extends Phaser.Scene {
     this.mainTarget = null;
     this.nextWanderAt = this.time.now + 3000;
 
+    // ---------- 千仔（吉祥物）：自主慢速漫步，点击它打开秘书面板 ----------
+    this.qz = this.add.sprite(180, 130, 'qianzai').setOrigin(0.5, 1);
+    this.qz.setData('dir', 'down');
+    this.qz.setDepth(130);
+    this.qzTarget = null;
+    this.qzNextWanderAt = this.time.now + 2000;
+
     // 点击地板走过去
     this.input.on('pointerdown', (p) => {
       const wp = this.cameras.main.getWorldPoint(p.x, p.y);
@@ -104,6 +125,11 @@ class OfficeScene extends Phaser.Scene {
           this.panels?.openTab(t.tab);
           return;
         }
+      }
+      // 点击千仔 → 秘书面板（玩家不被控制移动）
+      if (Math.abs(wp.x - this.qz.x) <= 10 && wp.y <= this.qz.y + 2 && wp.y >= this.qz.y - 18) {
+        this.panels?.openTab('secretary');
+        return;
       }
       this.mainTarget = {
         x: Phaser.Math.Clamp(wp.x, WALK_BOUNDS.minX, WALK_BOUNDS.maxX),
@@ -160,7 +186,7 @@ class OfficeScene extends Phaser.Scene {
 
   /* ---------- 循环 ---------- */
 
-  update() {
+  update(_time, delta) {
     // 闲逛
     if (!this.mainTarget && this.time.now >= this.nextWanderAt) {
       const spot = HOTSPOTS[Phaser.Math.Between(0, HOTSPOTS.length - 1)];
@@ -193,6 +219,34 @@ class OfficeScene extends Phaser.Scene {
       this.char.setFrame(IDLE_FRAME[this.char.getData('dir') || 'down']);
     }
     this.char.setDepth(Math.round(this.char.y));
+
+    // ---------- 千仔：自主慢速漫步（玩家不可控制） ----------
+    if (!this.qzTarget && this.time.now >= this.qzNextWanderAt) {
+      const r = QZ_REGIONS[Phaser.Math.Between(0, QZ_REGIONS.length - 1)];
+      this.qzTarget = {
+        x: Phaser.Math.Between(r.x1, r.x2),
+        y: Phaser.Math.Between(r.y1, r.y2),
+      };
+    }
+    if (this.qzTarget) {
+      const dx = this.qzTarget.x - this.qz.x;
+      const dy = this.qzTarget.y - this.qz.y;
+      const dist = Math.hypot(dx, dy);
+      const step = (QZ_SPEED * delta) / 1000;
+      if (dist <= step) {
+        this.qzTarget = null;
+        this.qzNextWanderAt = this.time.now + 3000 + Math.random() * 6000;
+        this.qz.anims.stop();
+        this.qz.setFrame(IDLE_FRAME[this.qz.getData('dir') || 'down']);
+      } else {
+        this.qz.x += (dx / dist) * step;
+        this.qz.y += (dy / dist) * step;
+        const nd = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : dy < 0 ? 'up' : 'down';
+        this.qz.setData('dir', nd);
+        this.qz.anims.play('qz-walk-' + nd, true);
+      }
+    }
+    this.qz.setDepth(Math.round(this.qz.y));
   }
 }
 

@@ -777,6 +777,54 @@ def o_big_screen():
     return s
 
 
+# ---------------- 千仔（绿色小章鱼吉祥物） ----------------
+QZ_BODY = (46, 196, 110)
+QZ_BODY_D = (28, 152, 84)
+QZ_BODY_L = (104, 226, 152)
+QZ_FACE = (24, 26, 30)
+
+
+def qz_frame(direction, frame):
+    if direction == 'left':
+        r = qz_frame('right', frame)
+        s2 = S(PW, 16)
+        for yy in range(16):
+            for xx in range(PW):
+                s2.set(PW - 1 - xx, yy, r.get(xx, yy))
+        return s2
+    s = S(PW, 16)
+    s.ell(3, 13, 12, 15, (20, 16, 24, 70))  # 影子
+    dy = 1 if frame == 1 else 0
+    lift = 1 if frame == 2 else 0
+    # 四条短触手（摆动）
+    s.ell(2, 9 + dy - lift, 4, 12 + dy, QZ_BODY)
+    s.ell(11, 9 + dy - (1 - lift), 13, 12 + dy, QZ_BODY)
+    s.ell(5, 10 + dy, 7, 14 + dy, QZ_BODY)
+    s.ell(8, 10 + dy, 10, 14 + dy, QZ_BODY)
+    s.ell(5, 12 + dy, 10, 14 + dy, QZ_BODY_D)
+    # 圆顶头
+    s.ell(3, 1 + dy, 12, 10 + dy, QZ_BODY)
+    s.ell(4, 2 + dy, 9, 4 + dy, QZ_BODY_L)
+    if direction == 'down':
+        # 大白眼 + 小瞳孔
+        s.ell(4, 3 + dy, 7, 8 + dy, P['white'])
+        s.ell(8, 3 + dy, 11, 8 + dy, P['white'])
+        s.rect(6, 5 + dy, 6, 6 + dy, QZ_FACE)
+        s.rect(9, 5 + dy, 9, 6 + dy, QZ_FACE)
+        # 眉毛
+        s.set(5, 2 + dy, QZ_FACE); s.set(10, 2 + dy, QZ_FACE)
+        # 微笑
+        s.set(7, 9 + dy, QZ_FACE); s.set(8, 9 + dy, QZ_FACE)
+    elif direction == 'right':
+        # 侧面：一只大眼靠右
+        s.ell(8, 3 + dy, 11, 8 + dy, P['white'])
+        s.rect(10, 5 + dy, 10, 6 + dy, QZ_FACE)
+        s.set(9, 2 + dy, QZ_FACE)
+        s.set(8, 9 + dy, QZ_FACE)
+    # up = 背面，无脸
+    return s
+
+
 # ---------------- characters ----------------
 def char_frame(direction, frame, shirt, shirt_l, shirt_d, hair, hair_l):
     s = S(PW, PH)
@@ -1030,6 +1078,13 @@ def generate_assets():
     for f in (0, 1):
         ptm.blit(npc_typing(f, P['shirt'], P['shirt_l'], P['hair'], P['hair_l'], P['shirt_d']), f * PW, 0)
     write_png(os.path.join(OUT_DIR, 'player_typing.png'), ptm.rows())
+
+    # 千仔吉祥物 sheet：4 方向 × 3 帧，每帧 16×16
+    qz = S(PW * 3, 16 * 4)
+    for row, d in enumerate(('down', 'up', 'right', 'left')):
+        for col, f in enumerate((0, 1, 2)):
+            qz.blit(qz_frame(d, f), col * PW, row * 16)
+    write_png(os.path.join(OUT_DIR, 'qianzai.png'), qz.rows())
 
     # typing npcs
     for name, (shirt, shirt_l, hair, hair_l) in NPC_SHIRTS.items():
