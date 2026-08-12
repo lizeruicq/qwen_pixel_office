@@ -777,6 +777,90 @@ def o_big_screen():
     return s
 
 
+def o_time_clock():
+    # 立式打卡机：立柱机身 + 顶部斜面小屏（常亮时钟） + 刷卡感应区
+    s = S(24, 32)
+    s.shadow(12, 29, 20, 5)
+    # 底座
+    s.rect(7, 27, 17, 28, P['ergo_d']); s.rect(8, 26, 16, 27, P['ergo'])
+    # 立柱机身
+    s.rect(8, 8, 16, 26, P['vend_d'])
+    s.rect(9, 9, 15, 25, P['vend'])
+    s.vl(9, 9, 25, P['vend_l'])
+    # 顶部斜面屏幕（亮蓝，显示 09:00）
+    s.rect(8, 4, 16, 9, P['black'])
+    s.rect(9, 5, 15, 8, P['scr'])
+    s.rect(9, 5, 15, 5, P['white'])  # 屏幕顶部高光
+    s.set(10, 6, P['black']); s.set(11, 6, P['black'])   # 0
+    s.set(13, 6, P['black'])                              # :
+    s.set(14, 6, P['black']); s.set(15, 6, P['black'])   # 9
+    # 刷卡感应区（绿色圆点呼吸灯）
+    s.ell(10, 14, 14, 18, P['ergo_d'])
+    s.ell(11, 15, 13, 17, P['led_g'])
+    s.set(12, 16, P['white'])
+    # 下方打卡按钮（红）
+    s.rect(10, 21, 14, 23, P['led_r'])
+    return s
+
+
+# ---------------- 玩家上半身胸像（RPG 对话框用，4 表情） ----------------
+def portrait(expr):
+    # 与 player.png 同人物：蓝衬衫 + 棕发 + 默认肤色。48x48 胸像，只露头与肩。
+    s = S(48, 48)
+    sk, sk_d, out = P['skin'], P['skin_d'], P['outline']
+    hair, hair_l = P['hair'], P['hair_l']
+    sh, sh_l, sh_d = P['shirt'], P['shirt_l'], P['shirt_d']
+    # 肩膀/衣领（底部）
+    s.rect(8, 38, 39, 47, out)
+    s.rect(9, 39, 38, 47, sh)
+    s.rect(9, 39, 38, 41, sh_l)
+    s.rect(9, 44, 38, 47, sh_d)
+    # 头（大椭圆）
+    s.ell(10, 4, 37, 38, out)
+    s.ell(11, 5, 36, 37, sk)
+    # 头发（盖头顶 + 两侧）
+    s.ell(11, 4, 36, 16, hair)
+    s.rect(11, 14, 15, 24, hair); s.rect(32, 14, 36, 24, hair)
+    s.hl(9, 14, 30, hair_l)
+    # 耳朵
+    s.rect(9, 22, 11, 26, sk); s.rect(36, 22, 38, 26, sk)
+    # 眉毛 + 眼 + 嘴按表情差异
+    if expr == 'happy':
+        # 弯眼笑：眼睛画成上弯弧线（眯眼笑），大笑嘴
+        s.rect(16, 19, 20, 20, hair); s.rect(27, 19, 31, 20, hair)   # 弯眉
+        s.rect(16, 22, 20, 23, out); s.set(17, 22, sk)               # 左眯眼
+        s.rect(27, 22, 31, 23, out); s.set(30, 22, sk)               # 右眯眼
+        s.rect(20, 28, 27, 31, out)                                   # 嘴
+        s.rect(21, 28, 26, 29, P['white'])                            # 牙齿
+        s.rect(21, 31, 26, 31, P['bkr'])                              # 口腔
+        s.rect(13, 25, 15, 27, (240, 160, 150))                       # 腮红
+        s.rect(32, 25, 34, 27, (240, 160, 150))
+    elif expr == 'tired':
+        # 半垂眼 + 眼袋 + 平直嘴
+        s.rect(16, 20, 20, 21, hair); s.rect(27, 20, 31, 21, hair)   # 平眉
+        s.rect(16, 23, 20, 24, out)                                   # 左眼（半闭）
+        s.hl(22, 16, 20, sk_d)                                        # 左眼皮
+        s.rect(27, 23, 31, 24, out); s.hl(22, 27, 31, sk_d)          # 右眼
+        s.hl(26, 17, 20, sk_d); s.hl(26, 27, 31, sk_d)               # 眼袋
+        s.rect(21, 30, 27, 30, out)                                   # 平嘴
+    elif expr == 'angry':
+        # 倒八眉 + 瞪眼 + 咬牙
+        s.rect(16, 19, 19, 20, hair); s.rect(17, 20, 20, 21, hair)   # 左倒八眉
+        s.rect(28, 19, 31, 20, hair); s.rect(27, 20, 30, 21, hair)   # 右倒八眉
+        s.rect(16, 23, 20, 25, P['white']); s.set(18, 24, out)        # 左瞪眼
+        s.rect(27, 23, 31, 25, P['white']); s.set(29, 24, out)        # 右瞪眼
+        s.rect(20, 29, 27, 30, out)                                   # 咬牙
+        s.rect(21, 29, 26, 29, P['white'])
+        s.set(14, 26, (240, 150, 140)); s.set(33, 26, (240, 150, 140))  # 怒红
+    else:  # normal
+        s.rect(16, 19, 20, 20, hair); s.rect(27, 19, 31, 20, hair)   # 平眉
+        s.rect(16, 22, 19, 24, P['white']); s.set(18, 23, out)        # 左眼
+        s.rect(28, 22, 31, 24, P['white']); s.set(29, 23, out)        # 右眼
+        s.rect(21, 29, 26, 30, out)                                   # 微张嘴
+        s.set(22, 29, sk_d)
+    return s
+
+
 # ---------------- 千仔（绿色小章鱼吉祥物） ----------------
 QZ_BODY = (46, 196, 110)
 QZ_BODY_D = (28, 152, 84)
@@ -1015,6 +1099,7 @@ OBJECTS = {
     'lamp': o_lamp,
     'filing': o_filing,
     'big_screen': o_big_screen,
+    'time_clock': o_time_clock,
 }
 
 NPC_SHIRTS = {
@@ -1078,6 +1163,10 @@ def generate_assets():
     for f in (0, 1):
         ptm.blit(npc_typing(f, P['shirt'], P['shirt_l'], P['hair'], P['hair_l'], P['shirt_d']), f * PW, 0)
     write_png(os.path.join(OUT_DIR, 'player_typing.png'), ptm.rows())
+
+    # 玩家上半身胸像（RPG 对话框用）：同人物 4 表情
+    for expr in ('happy', 'normal', 'tired', 'angry'):
+        write_png(os.path.join(OUT_DIR, 'portrait_%s.png' % expr), portrait(expr).rows())
 
     # 千仔吉祥物 sheet：4 方向 × 3 帧，每帧 16×16
     qz = S(PW * 3, 16 * 4)

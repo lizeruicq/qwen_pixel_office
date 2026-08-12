@@ -89,6 +89,8 @@ export const OBJECTS = [
   { key: 'scooter', x: 26, y: 140 },
   { key: 'kanban', x: 44, y: 204 },
   { key: 'kanban', x: 80, y: 204 },
+  // 入口处打卡机（门垫 c9-10/r12 旁）
+  { key: 'time_clock', x: 132, y: 200 },
 ];
 
 /** 碰撞 footprint（来自参考项目） */
@@ -116,6 +118,7 @@ export const FOOTPRINTS = {
   big_screen: [40, 8],
   lamp: [10, 8],
   trash: [10, 8],
+  time_clock: [16, 6],
 };
 
 /** 功能热点（钉钉实体投射） */
@@ -147,6 +150,12 @@ export const PANEL_TRIGGERS = [
   { tab: 'tasks', x: 44, y: 204, w: 36, h: 34 }, // 左白板 → 待办
   { tab: 'secretary', x: 80, y: 204, w: 36, h: 34 }, // 右白板 → 秘书
 ];
+
+/** 打卡机：点击区域 + 玩家站立点（打卡机物件在 132,200） */
+export const TIME_CLOCK = {
+  x: 132, y: 200, w: 24, h: 32, // 点击检测区域（中心 x / 底边 y / 宽 / 高）
+  standX: 132, standY: 176,      // 玩家走到打卡机前的站立点
+};
 
 /** 光晕：[x, y, warm|cool] */
 export const GLOWS = [

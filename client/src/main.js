@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import {
-  TILE, MAP, T, floorLayout, OBJECTS, FOOTPRINTS, HOTSPOTS, WALK_BOUNDS, SPAWN, GLOWS, PANEL_TRIGGERS,
+  TILE, MAP, T, floorLayout, OBJECTS, FOOTPRINTS, HOTSPOTS, WALK_BOUNDS, SPAWN, GLOWS, PANEL_TRIGGERS, TIME_CLOCK,
 } from './config/scene.js';
 import { GameSocket } from './net/ws.js';
 import { initPanels } from './ui/panels.js';
@@ -131,6 +131,13 @@ class OfficeScene extends Phaser.Scene {
         this.panels?.openTab('secretary');
         return;
       }
+      // 点击打卡机 → 玩家走到打卡机前，到位后打开打卡面板
+      const tc = TIME_CLOCK;
+      if (wp.x >= tc.x - tc.w / 2 && wp.x <= tc.x + tc.w / 2 && wp.y >= tc.y - tc.h && wp.y <= tc.y) {
+        this.punchPending = true;
+        this.mainTarget = { x: tc.standX, y: tc.standY };
+        return;
+      }
       this.mainTarget = {
         x: Phaser.Math.Clamp(wp.x, WALK_BOUNDS.minX, WALK_BOUNDS.maxX),
         y: Phaser.Math.Clamp(wp.y, WALK_BOUNDS.minY, WALK_BOUNDS.maxY),
@@ -153,6 +160,58 @@ class OfficeScene extends Phaser.Scene {
     this.panels = initPanels(this.socket);
     const autoPanel = new URLSearchParams(location.search).get('panel');
     if (['tasks', 'messages', 'events', 'secretary'].includes(autoPanel)) this.panels.openTab(autoPanel);
+
+    // ---------- 打卡机 ----------
+    this.punchPending = false;
+    $('punch-no').onclick = () => this.closePunch();
+    $('punch-yes').onclick = () => this.doPunch();
+    $('rpg-box').onclick = () => { $('rpg-box').hidden = true; };
+  }
+
+  /* ---------- 打卡 ---------- */
+
+  /* 当前游戏内时间（毫秒），优先用时钟广播，离线退回本地 */
+  gameNow() {
+    return this.clockInfo ? this.clockInfo.now + (performance.now() - this.clockInfo.at) : Date.now();
+  }
+
+  /* 时段判定：返回 'in' 上班 / 'out' 下班 / null 不可打卡 */
+  punchWindow() {
+    const d = new Date(this.gameNow());
+    const mins = d.getHours() * 60 + d.getMinutes();
+    if (mins >= 9 * 60 && mins < 9 * 60 + 30) return 'in';   // 09:00–09:30
+    if (mins >= 18 * 60) return 'out';                        // 18:00–24:00
+    return null;
+  }
+
+  openPunch() {
+    const w = this.punchWindow();
+    const text = $('punch-text');
+    if (w === 'in') text.textContent = '要打卡上班吗？';
+    else if (w === 'out') text.textContent = '要打卡下班吗？';
+    else text.textContent = '现在不是打卡时间。';
+    $('punch-yes').style.display = w ? '' : 'none';
+    $('punch-panel').hidden = false;
+  }
+
+  closePunch() {
+    $('punch-panel').hidden = true;
+  }
+
+  doPunch() {
+    const w = this.punchWindow();
+    this.closePunch();
+    if (!w) return;
+    const portrait = $('rpg-portrait');
+    const text = $('rpg-text');
+    if (w === 'in') {
+      portrait.src = '/assets/portrait_happy.png';
+      text.textContent = '打卡成功，开始一天的工作！';
+    } else {
+      portrait.src = '/assets/portrait_normal.png';
+      text.textContent = '打卡下班，总觉得还有些事没做完…';
+    }
+    $('rpg-box').hidden = false;
   }
 
   /* ---------- UI ---------- */
@@ -252,6 +311,11 @@ class OfficeScene extends Phaser.Scene {
         this.char.setVelocity(0, 0);
         this.mainTarget = null;
         this.nextWanderAt = this.time.now + 4000 + Math.random() * 5000;
+        // 走到打卡机前了 → 打开打卡面板
+        if (this.punchPending) {
+          this.punchPending = false;
+          this.openPunch();
+        }
       } else {
         this.char.setVelocity((dx / dist) * SPEED, (dy / dist) * SPEED);
         const nd = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : dy < 0 ? 'up' : 'down';
