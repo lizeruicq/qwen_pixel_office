@@ -366,7 +366,7 @@ class OfficeScene extends Phaser.Scene {
       return;
     }
     const yes = await confirmPanel({
-      image: '/assets/objects/time_clock.png',
+      image: '/assets/objects/signmachine.jpg',
       text: w === 'in' ? '要打卡上班吗？' : '要打卡下班吗？',
     });
     if (!yes) return;

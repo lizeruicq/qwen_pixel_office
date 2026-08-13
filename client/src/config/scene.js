@@ -66,7 +66,7 @@ export const PHASE_TO_SKY = { 清晨: 'morning', 上午: 'forenoon', 下午: 'fo
 /** 物件对象层（中心 x，底边 y） */
 export const OBJECTS = [
   // 顶墙：饮水机 + 并排书架
-  { key: 'water_cooler', x: 250, y: 44 },
+  { key: 'water_cooler', x: 320, y: 96 },
   { key: 'bookshelf', x: 290, y: 44 },
   { key: 'bookshelf', x: 324, y: 44 },
   // 圆桌讨论角（吧凳），靠近右上书架
@@ -78,7 +78,7 @@ export const OBJECTS = [
   { key: 'big_screen', x: 84, y: 80 },
   // 右墙：咖啡吧
   { key: 'coffee_machine', x: 330, y: 96 },
-  { key: 'fridge', x: 330, y: 140 },
+  { key: 'fridge', x: 200, y: 44 },
   { key: 'plant_monstera', x: 326, y: 188 },
   // 2×2 工位（带电脑）
   { key: 'desk_dual', x: 60, y: 108 },
@@ -94,9 +94,16 @@ export const OBJECTS = [
   // 休息区
   { key: 'lamp', x: 228, y: 148 },
   { key: 'sofa', x: 276, y: 156 },
+  { key: 'foosball', x: 276, y: 132 },        // 足球桌，沙发上方
   { key: 'armchair', x: 232, y: 180 },
   { key: 'coffee_table', x: 276, y: 186 },
   { key: 'beanbag', x: 222, y: 204 },
+  // 大屏幕后方：3 台服务器机柜（贴墙成排、向上提一点）
+  { key: 'server_rack', x: 74, y: 66 },
+  { key: 'server_rack', x: 84, y: 66 },
+  { key: 'server_rack', x: 94, y: 66 },
+  // 右上角贴窗、与饮水机/书架平行（水吧区）：饮水机左侧的自动售货机
+  { key: 'vending', x: 226, y: 44},
   // 左墙
   { key: 'plant_small', x: 30, y: 92 },
   { key: 'scooter', x: 26, y: 140 },
@@ -122,6 +129,9 @@ export const FOOTPRINTS = {
   coffee_machine: [12, 10],
   water_cooler: [12, 10],
   snack_shelf: [28, 8],
+  foosball: [28, 10],
+  server_rack: [14, 8],
+  vending: [22, 8],
   fridge: [20, 10],
   cactus: [10, 8],
   beanbag: [14, 8],
