@@ -86,7 +86,19 @@ function injectStyles() {
     .px-phone .msg.them { align-self: flex-start; background: #2a2e38; }
     .px-phone .msg.them.boss { background: #43341c; }
     .px-phone .msg.them.xiaomei { background: #35265c; }
+    .px-phone .msg.me { align-self: flex-end; background: #1f3d5c; color: #cfe3ff; }
     .px-phone .empty { color: #636e7b; font-size: 11px; text-align: center; margin-top: 20px; }
+    /* 回复输入行 */
+    .px-phone .reply-bar { display: flex; gap: 4px; padding: 6px; background: #10131a; border-top: 2px solid #05070a; }
+    .px-phone .reply-bar input {
+      flex: 1; min-width: 0; background: #14161a; border: 2px solid #05070a; color: #d8dee6;
+      font-family: inherit; font-size: 11px; padding: 5px 7px; border-radius: 4px;
+    }
+    .px-phone .reply-bar button {
+      background: #316dca; color: #fff; border: 2px solid #05070a; border-radius: 4px;
+      font-family: inherit; font-size: 11px; padding: 5px 9px; cursor: pointer; flex: 0 0 auto;
+    }
+    .px-phone .reply-bar[hidden] { display: none; }
   `;
   const style = document.createElement('style');
   style.textContent = css;
@@ -110,6 +122,10 @@ export function createPhone() {
         <div class="titlebar"><span class="back" hidden>‹</span><span class="title">消息</span></div>
         <div class="conv-list"></div>
         <div class="chat-log" hidden></div>
+        <div class="reply-bar" hidden>
+          <input class="reply-input" placeholder="回复…" />
+          <button class="reply-send">发送</button>
+        </div>
       </div>
       <div class="home"></div>
     </div>`;
@@ -119,6 +135,9 @@ export function createPhone() {
   const titleEl = root.querySelector('.title');
   const listEl = root.querySelector('.conv-list');
   const chatEl = root.querySelector('.chat-log');
+  const replyBar = root.querySelector('.reply-bar');
+  const replyInput = root.querySelector('.reply-input');
+  const replySend = root.querySelector('.reply-send');
 
   // 每个联系人的消息记录 + 未读数
   const threads = { boss: { msgs: [], unread: 0 }, xiaomei: { msgs: [], unread: 0 } };
@@ -155,7 +174,7 @@ export function createPhone() {
     }
     for (const m of th.msgs) {
       const div = document.createElement('div');
-      div.className = `msg them ${open}`;
+      div.className = m.mine ? 'msg me' : `msg them ${open}`;
       div.textContent = m.text;
       chatEl.appendChild(div);
     }
@@ -169,6 +188,8 @@ export function createPhone() {
     backBtn.hidden = false;
     listEl.hidden = true;
     chatEl.hidden = false;
+    replyBar.hidden = false;
+    replyInput.focus();
     renderChat();
   }
 
@@ -177,11 +198,27 @@ export function createPhone() {
     titleEl.textContent = '消息';
     backBtn.hidden = true;
     chatEl.hidden = true;
+    replyBar.hidden = true;
     listEl.hidden = false;
     renderList();
   }
 
   backBtn.onclick = closeChat;
+
+  /* 发送我的回复：塞进当前会话（mine 标记，右侧气泡） */
+  function sendReply() {
+    const text = replyInput.value.trim();
+    if (!text || !open) return;
+    threads[open].msgs.push({ text, ts: Date.now(), mine: true });
+    replyInput.value = '';
+    renderChat();
+  }
+  replySend.onclick = sendReply;
+  replyInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendReply();
+    e.stopPropagation(); // 避免触发游戏画布按键
+  });
+
   renderList();
 
   return {
@@ -199,6 +236,13 @@ export function createPhone() {
         threads[from].unread += 1;
         if (!open) renderList(); // 列表页实时刷新预览+红点
       }
+    },
+    /** 清空聊天记录；from 省略则清空所有联系人 */
+    clear(from) {
+      for (const key of from ? [from] : Object.keys(threads)) {
+        if (threads[key]) { threads[key].msgs = []; threads[key].unread = 0; }
+      }
+      if (open) renderChat(); else renderList();
     },
     destroy() { root.remove(); },
   };

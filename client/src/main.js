@@ -1,13 +1,14 @@
 import Phaser from 'phaser';
 import {
   TILE, MAP, T, floorLayout, OBJECTS, FOOTPRINTS, HOTSPOTS, WALK_BOUNDS, SPAWN, GLOWS, PANEL_TRIGGERS, TIME_CLOCK,
-  COFFEE_MACHINE, SEATS, WORKERS, SKY_STATES, PHASE_TO_SKY, SKY,
+  COFFEE_MACHINE, SEATS, WORKERS, BOSS, SKY_STATES, PHASE_TO_SKY, SKY,
 } from './config/scene.js';
 import { GameSocket } from './net/ws.js';
 import { initPanels } from './ui/panels.js';
 import { confirmPanel, rpgDialog } from './ui/dialogs.js';
 import { createBubble } from './ui/bubble.js';
 import { createPhone } from './ui/phone.js';
+import { makePortrait } from './ui/portrait.js';
 
 const W = MAP.cols * TILE; // 352
 const H = MAP.rows * TILE; // 224
@@ -41,7 +42,7 @@ class OfficeScene extends Phaser.Scene {
       this.load.spritesheet(wkr.typing, `/assets/${wkr.typing}.png`, { frameWidth: 16, frameHeight: 24 });
     }
     // 老板：4 方向行走表（16×24/帧），frame0=正面（面朝镜头/同事）
-    this.load.spritesheet('boss', '/assets/npcwalk.png', { frameWidth: 16, frameHeight: 24 });
+    this.load.spritesheet('boss', `/assets/${BOSS.sprite}.png`, { frameWidth: 16, frameHeight: 24 });
     for (const o of OBJECTS) this.load.image('obj_' + o.key, `/assets/objects/${o.key}.png`);
   }
 
@@ -111,12 +112,6 @@ class OfficeScene extends Phaser.Scene {
         frameRate: 3, repeat: -1,
       });
     }
-    // 老板 idle：面朝下两帧轻微摆动（frame 0/1/2 均为正面朝向，仅腿部交替）
-    this.anims.create({
-      key: 'boss-idle',
-      frames: this.anims.generateFrameNumbers('boss', { frames: [0, 1, 0, 2] }),
-      frameRate: 2, repeat: -1,
-    });
 
     // ---------- 物件对象层（y-sort + 碰撞） ----------
     const furniture = this.physics.add.staticGroup();
@@ -139,6 +134,8 @@ class OfficeScene extends Phaser.Scene {
     this.physics.add.collider(this.char, furniture);
     // 引用碰撞体，落座时可关闭避免卡死
     this.charCollider = this.physics.add.collider(this.char, furniture);
+    // 玩家对话胸像（从 player 正面帧采样）
+    this.playerPortrait = makePortrait(this, 'player');
 
     this.mainTarget = null;
     this.nextWanderAt = this.time.now + 3000;
@@ -158,15 +155,18 @@ class OfficeScene extends Phaser.Scene {
       spr.setDepth(Math.round(seat.seatY));
       spr.anims.play('type-' + cfg.id, true);
       const bubble = createBubble();
-      this.workers.push({ cfg, seat, spr, bubble, nextChatterAt: this.time.now + 4000 + Math.random() * 6000 });
+      const portrait = makePortrait(this, cfg.typing); // 从打字图采样配色的胸像
+      this.workers.push({ cfg, seat, spr, bubble, portrait });
     }
     // 千仔气泡（紫色）
     this.qzBubble = createBubble({ qz: true });
 
-    // ---------- 老板：站在大屏幕旁，不移动，保持 idle ----------
-    this.boss = this.add.sprite(126, 92, 'boss').setOrigin(0.5, 1);
-    this.boss.setDepth(Math.round(92));
-    this.boss.anims.play('boss-idle', true);
+    // ---------- 老板：站在大屏幕旁，不移动，保持 idle（面朝镜头） ----------
+    this.boss = this.add.sprite(BOSS.x, BOSS.y, 'boss').setOrigin(0.5, 1);
+    this.boss.setDepth(Math.round(BOSS.y));
+    this.boss.setFrame(0); // 正面朝向
+    this.bossBubble = createBubble();
+    this.bossPortrait = makePortrait(this, 'boss');
 
     // ---------- 手机界面（右下角，调试页控制开关/推消息） ----------
     this.phone = createPhone();
@@ -177,18 +177,22 @@ class OfficeScene extends Phaser.Scene {
     this.setVisible('boss', true);
     this.setVisible('phone', false); // 手机默认收起
 
+    // ---------- 暴露给调试/控制台：胸像注册表 + 手机控制 ----------
+    window.OFFICE = {
+      portraits: {
+        '主角': this.playerPortrait,
+        '老板': this.bossPortrait,
+        '小蓝': this.workers[0]?.portrait,
+        '小橙': this.workers[1]?.portrait,
+      },
+      phone: this.phone,
+    };
+
     // ---------- 落座状态 ----------
     this.seat = null;          // 玩家当前落座的 SEAT 项
     this.coffeePending = false; // 走到咖啡机前后触发
     this.chatTarget = null;    // 走到同事前后触发的闲聊对象
 
-    // 同事闲聊语料（工作吐槽 / 自我 PUA / 自我鼓励）
-    this.CHATTER = [
-      '需求又改了，第三版了…', '这周的 OKR 还没动呢', '老板说要"闭环"，啥是闭环',
-      '又加班，地铁都没了', '这 bug 我改了两天了', '我没事，我可以的',
-      '加油，打工人！', '卷赢他们，年底评个 S', '再扛一扛，发完这版就好了',
-      '我要偷偷努力，惊艳所有人', '咖啡续命中…', '这个会完全不用开',
-    ];
     // 闲聊对话库（玩家先、同事答，两轮）
     this.CHAT_SCRIPTS = [
       [['在忙吗？', '嗯，需求堆成山了。'], ['需要帮忙吗？', '不用不用，我扛得住…大概。']],
@@ -386,15 +390,15 @@ class OfficeScene extends Phaser.Scene {
     await rpgDialog({ portrait: '/assets/portrait_happy.png', text: '咕咚咕咚……一杯美式下肚，精神多了！' });
   }
 
-  /* ---------- 和同事闲聊（玩家先、同事答，两轮） ---------- */
+  /* ---------- 和同事闲聊（玩家先、同事答，两轮，用各自胸像） ---------- */
   async chatWithWorker(w) {
     const script = this.CHAT_SCRIPTS[Phaser.Math.Between(0, this.CHAT_SCRIPTS.length - 1)];
     const name = w.cfg.name;
     const pause = (ms) => new Promise((r) => setTimeout(r, ms));
     for (const [mine, theirs] of script) {
-      await rpgDialog({ portrait: '/assets/portrait_normal.png', text: `${mine}` });
+      await rpgDialog({ portrait: this.playerPortrait, text: `${mine}` });
       await pause(240);
-      await rpgDialog({ portrait: w.cfg.portrait, text: `${name}：${theirs}` });
+      await rpgDialog({ portrait: w.portrait, text: `${name}：${theirs}` });
       await pause(240);
     }
   }
@@ -448,6 +452,21 @@ class OfficeScene extends Phaser.Scene {
     if (this.qz && this.qz.visible) this.qzBubble?.say(text, ms);
   }
 
+  /* 指定角色头顶气泡（调试页手动触发）。target: boss | worker0 | worker1 | qz */
+  showBubble(target, text) {
+    if (!text) return;
+    if (target === 'qz') {
+      if (this.qz?.visible) this.qzBubble?.say(text, 4000);
+      return;
+    }
+    if (target === 'boss') {
+      if (this.boss?.visible) this.bossBubble?.say(text, 4000);
+      return;
+    }
+    const w = this.workers?.find((x) => x.cfg.id === target);
+    if (w && w.spr.visible) w.bubble.say(text, 4000);
+  }
+
   onWs(msg) {
     this.panels?.handleWs(msg);
     switch (msg.type) {      case 'state':
@@ -473,14 +492,19 @@ class OfficeScene extends Phaser.Scene {
       case 'ui_panel': // 调试页触发的确认面板
         void confirmPanel({ image: msg.image || undefined, text: msg.text || '' });
         break;
-      case 'ui_dialog': // 调试页触发的 RPG 对话
-        void rpgDialog({ portrait: msg.portrait || undefined, text: msg.text || '' });
+      case 'ui_dialog': { // 调试页触发的 RPG 对话（portraitKey 优先，取角色胸像）
+        const port = (msg.portraitKey && window.OFFICE?.portraits?.[msg.portraitKey]) || msg.portrait || undefined;
+        void rpgDialog({ portrait: port, text: msg.text || '' });
         break;
+      }
       case 'ui_toggle': // 调试页控制角色/手机显隐
         this.setVisible(msg.target, msg.show);
         break;
       case 'ui_phone_msg': // 调试页往手机推一条消息
         this.phone?.push(msg.from, msg.text || '');
+        break;
+      case 'ui_bubble': // 调试页指定角色头顶气泡
+        this.showBubble(msg.target, msg.text || '');
         break;
       case 'time':
         this.clockInfo = { now: msg.now, phase: msg.phase, mode: msg.mode, at: performance.now() };
@@ -612,19 +636,12 @@ class OfficeScene extends Phaser.Scene {
     }
     if (qzOn) this.qz.setDepth(Math.round(this.qz.y));
 
-    // ---------- 同事：随机工作吐槽气泡 + 始终打字（隐藏时跳过） ----------
+    // ---------- 气泡跟随（内容由调试页手动触发，此处只负责跟随位置） ----------
     for (const w of this.workers) {
-      if (w.spr.visible) {
-        if (this.time.now >= w.nextChatterAt) {
-          w.nextChatterAt = this.time.now + 7000 + Math.random() * 9000;
-          if (!w.bubble.visible) {
-            w.bubble.say(this.CHATTER[Phaser.Math.Between(0, this.CHATTER.length - 1)], 3400);
-          }
-        }
-        w.bubble.follow(w.spr, this.cameras.main);
-      }
+      if (w.spr.visible) w.bubble.follow(w.spr, this.cameras.main);
     }
     if (qzOn) this.qzBubble.follow(this.qz, this.cameras.main);
+    if (this.boss?.visible) this.bossBubble.follow(this.boss, this.cameras.main);
   }
 }
 

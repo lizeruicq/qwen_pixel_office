@@ -188,15 +188,15 @@ export class PushServer {
       if (msg.type === 'debug_ui') {
         // 调试页控制游戏窗口：弹面板/对话、显隐角色、推手机消息 —— 广播给所有客户端渲染
         const m = msg as {
-          type: 'debug_ui'; kind: 'panel' | 'dialog' | 'toggle' | 'phone_msg';
-          image?: string; portrait?: string; text?: string;
-          target?: 'qz' | 'workers' | 'boss' | 'phone'; show?: boolean; from?: 'boss' | 'xiaomei';
+          type: 'debug_ui'; kind: 'panel' | 'dialog' | 'toggle' | 'phone_msg' | 'bubble';
+          image?: string; portrait?: string; portraitKey?: string; text?: string;
+          target?: 'qz' | 'workers' | 'boss' | 'phone' | 'worker0' | 'worker1'; show?: boolean; from?: 'boss' | 'xiaomei';
         };
         if (m.kind === 'panel') {
           this.broadcast({ type: 'ui_panel', image: String(m.image ?? ''), text: String(m.text ?? '') });
           log('debug', `调试面板：${String(m.text ?? '').slice(0, 24)}`);
         } else if (m.kind === 'dialog') {
-          this.broadcast({ type: 'ui_dialog', portrait: String(m.portrait ?? ''), text: String(m.text ?? '') });
+          this.broadcast({ type: 'ui_dialog', portrait: String(m.portrait ?? ''), portraitKey: m.portraitKey ? String(m.portraitKey) : undefined, text: String(m.text ?? '') });
           log('debug', `调试对话：${String(m.text ?? '').slice(0, 24)}`);
         } else if (m.kind === 'toggle' && m.target) {
           this.broadcast({ type: 'ui_toggle', target: m.target, show: Boolean(m.show) });
@@ -204,6 +204,9 @@ export class PushServer {
         } else if (m.kind === 'phone_msg' && m.from) {
           this.broadcast({ type: 'ui_phone_msg', from: m.from, text: String(m.text ?? '') });
           log('debug', `手机消息 ${m.from}：${String(m.text ?? '').slice(0, 24)}`);
+        } else if (m.kind === 'bubble' && m.target) {
+          this.broadcast({ type: 'ui_bubble', target: m.target, text: String(m.text ?? '') });
+          log('debug', `气泡 ${m.target}：${String(m.text ?? '').slice(0, 24)}`);
         }
         return;
       }

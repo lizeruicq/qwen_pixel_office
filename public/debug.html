@@ -102,10 +102,18 @@
 
     <h2 style="margin-top:16px">对话框弹出（游戏内）</h2>
     <select id="dlg-portrait">
-      <option value="/assets/portrait_normal.png">主角·正常</option>
-      <option value="/assets/portrait_happy.png">主角·开心</option>
-      <option value="/assets/portrait_tired.png">主角·疲惫</option>
-      <option value="/assets/portrait_angry.png">主角·生气</option>
+      <optgroup label="角色胸像">
+        <option value="key:主角">主角（胸像）</option>
+        <option value="key:老板">老板（胸像）</option>
+        <option value="key:小蓝">小蓝·同事（胸像）</option>
+        <option value="key:小橙">小橙·同事（胸像）</option>
+      </optgroup>
+      <optgroup label="主角状态图">
+        <option value="/assets/portrait_normal.png">正常</option>
+        <option value="/assets/portrait_happy.png">开心</option>
+        <option value="/assets/portrait_tired.png">疲惫</option>
+        <option value="/assets/portrait_angry.png">生气</option>
+      </optgroup>
     </select>
     <input id="dlg-text" placeholder="对话文字">
     <button class="primary" id="btn-dialog">弹出对话框</button>
@@ -125,6 +133,16 @@
     </select>
     <input id="pm-text" placeholder="消息内容">
     <button class="primary" id="btn-phone-msg">发一条消息</button>
+
+    <h2 style="margin-top:16px">头顶气泡（游戏内）</h2>
+    <select id="bb-target">
+      <option value="boss">老板</option>
+      <option value="worker0">小蓝（同事）</option>
+      <option value="worker1">小橙（同事）</option>
+      <option value="qz">千仔</option>
+    </select>
+    <input id="bb-text" placeholder="气泡内容">
+    <button class="primary" id="btn-bubble">冒一个气泡</button>
   </section>
 
   <section>
@@ -238,7 +256,11 @@ $('btn-panel').onclick = () => {
 $('btn-dialog').onclick = () => {
   const text = $('dlg-text').value.trim();
   if (!text) return;
-  send({ type: 'debug_ui', kind: 'dialog', portrait: $('dlg-portrait').value, text });
+  const v = $('dlg-portrait').value;
+  const msg = { type: 'debug_ui', kind: 'dialog', text };
+  if (v.startsWith('key:')) msg.portraitKey = v.slice(4); // 角色胸像
+  else msg.portrait = v; // 图片路径
+  send(msg);
 };
 // 角色/界面显隐开关
 for (const target of ['qz', 'workers', 'boss', 'phone']) {
@@ -250,6 +272,13 @@ $('btn-phone-msg').onclick = () => {
   if (!text) return;
   send({ type: 'debug_ui', kind: 'phone_msg', from: $('pm-from').value, text });
   $('pm-text').value = '';
+};
+// 头顶气泡
+$('btn-bubble').onclick = () => {
+  const text = $('bb-text').value.trim();
+  if (!text) return;
+  send({ type: 'debug_ui', kind: 'bubble', target: $('bb-target').value, text });
+  $('bb-text').value = '';
 };
 $('btn-manual').onclick = () => {
   const v = $('manual-dt').value; // "YYYY-MM-DDTHH:mm"
