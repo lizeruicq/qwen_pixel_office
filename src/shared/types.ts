@@ -80,7 +80,9 @@ export type ServerMessage =
   | { type: 'notice'; text: string; ts: number }
   | { type: 'time'; mode: 'natural' | 'manual'; now: number; phase: string; ts: number }
   | { type: 'ui_panel'; image: string; text: string }   // 调试：游戏内弹确认面板
-  | { type: 'ui_dialog'; portrait: string; text: string }; // 调试：游戏内弹 RPG 对话
+  | { type: 'ui_dialog'; portrait: string; text: string } // 调试：游戏内弹 RPG 对话
+  | { type: 'ui_toggle'; target: 'qz' | 'workers' | 'boss' | 'phone'; show: boolean } // 调试：显隐角色/手机
+  | { type: 'ui_phone_msg'; from: 'boss' | 'xiaomei'; text: string }; // 调试：往手机推一条消息
 
 /** client→server 请求消息 */
 export type ClientMessage =
@@ -91,4 +93,10 @@ export type ClientMessage =
   | { type: 'agent_cancel' }
   | { type: 'set_time'; mode: 'natural' | 'manual'; ms?: number }
   | { type: 'adjust_stat'; stat: 'energy' | 'mood' | 'focus' | 'coins'; delta: number }
-  | { type: 'debug_ui'; kind: 'panel' | 'dialog'; image?: string; portrait?: string; text: string };
+  | {
+      type: 'debug_ui';
+      kind: 'panel' | 'dialog' | 'toggle' | 'phone_msg';
+      image?: string; portrait?: string; text?: string;
+      target?: 'qz' | 'workers' | 'boss' | 'phone'; show?: boolean;
+      from?: 'boss' | 'xiaomei';
+    };

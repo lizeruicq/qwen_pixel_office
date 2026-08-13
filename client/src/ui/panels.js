@@ -39,6 +39,13 @@ export function initPanels(socket) {
     setOpen(true);
   }
 
+  /* 千仔显隐（调试页控制）：隐藏时移除秘书 tab，若正开着则切走 */
+  function setQzVisible(show) {
+    const btn = document.querySelector('#drawer-tabs [data-tab="secretary"]');
+    if (btn) btn.hidden = !show;
+    if (!show && tab === 'secretary') setOpen(false);
+  }
+
   for (const b of document.querySelectorAll('#drawer-tabs [data-tab]')) {
     b.onclick = () => openTab(b.dataset.tab);
   }
@@ -113,30 +120,12 @@ export function initPanels(socket) {
     if (e.key === 'Enter') sendReply();
   });
 
-  /* ---------- 快捷 AI 指令 ---------- */
+  /* ---------- 快捷 AI 指令（消息面板已不需要 AI，保留秘书面板的快捷指令） ---------- */
 
   const aiChat = (text) => {
     socket.send({ type: 'agent_chat', text });
     addEvent('ai', `你 → 千仔：${text}`);
   };
-
-  $('msg-quick').innerHTML = ['总结本群', '起草回复']
-    .map((t) => `<button data-q="${t}">${t}</button>`)
-    .join('');
-  for (const b of $('msg-quick').querySelectorAll('button')) {
-    b.onclick = () => {
-      const c = convs.find((x) => x.id === curConv);
-      if (!c) {
-        $('ai-line').textContent = '尚未选中会话——钉钉里来消息后自动出现。';
-        return;
-      }
-      if (b.dataset.q === '总结本群') {
-        aiChat(`总结群「${c.title}」（会话 ID ${c.id}）最近的消息`);
-      } else {
-        aiChat(`会话 ID ${c.id}（「${c.title}」）。读最近几条消息后，以我的口吻起草一条回复；不要直接发送，调用发送工具走我的确认。`);
-      }
-    };
-  }
 
   const SEC_QUICK = [
     ['查看待办', '查看我的待办'],
@@ -301,5 +290,5 @@ export function initPanels(socket) {
     }
   }
 
-  return { openTab, handleWs, setOpen };
+  return { openTab, handleWs, setOpen, setQzVisible };
 }

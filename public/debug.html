@@ -38,6 +38,9 @@
   .tag.o2o_msg { background: #24461f; color: #8ddb8c; }
   .tag.todo_added,.tag.todo_done,.tag.todo_near_due,.tag.todo_overdue { background: #43341c; color: #eac54f; }
   .dim { color: #636e7b; }
+  .toggles { display: flex; flex-direction: column; gap: 6px; }
+  .toggles label { display: flex; align-items: center; gap: 6px; cursor: pointer; color: #adbac7; }
+  .toggles input[type=checkbox] { width: auto; margin: 0; accent-color: #316dca; }
   .tier { font-weight: bold; }
   .tier-兴奋 { color: #eac54f; } .tier-开心 { color: #8ddb8c; } .tier-平静 { color: #6cb6ff; } .tier-疲惫 { color: #dc8850; } .tier-倦怠 { color: #f47067; }
 </style>
@@ -107,8 +110,21 @@
     <input id="dlg-text" placeholder="对话文字">
     <button class="primary" id="btn-dialog">弹出对话框</button>
 
-    <h2 style="margin-top:16px">待办列表</h2>
-    <ul id="todos"><li class="dim">等待数据…</li></ul>
+    <h2 style="margin-top:16px">角色 / 界面开关</h2>
+    <div class="toggles">
+      <label><input type="checkbox" id="tg-qz" checked> 千仔</label>
+      <label><input type="checkbox" id="tg-workers" checked> 两名同事</label>
+      <label><input type="checkbox" id="tg-boss" checked> 老板</label>
+      <label><input type="checkbox" id="tg-phone"> 手机界面</label>
+    </div>
+
+    <h2 style="margin-top:16px">手机消息推送</h2>
+    <select id="pm-from">
+      <option value="boss">老板</option>
+      <option value="xiaomei">小美</option>
+    </select>
+    <input id="pm-text" placeholder="消息内容">
+    <button class="primary" id="btn-phone-msg">发一条消息</button>
   </section>
 
   <section>
@@ -131,7 +147,6 @@ function connect() {
 function route(msg) {
   switch (msg.type) {
     case 'state': state = msg.state; renderState(); break;
-    case 'todos': renderTodos(msg.items); break;
     case 'game_event': addEvent(msg); break;
     case 'agent_card': addCard(msg); break;
     case 'notice': addEvent({ kind: 'notice', payload: { text: msg.text }, ts: msg.ts }); break;
@@ -161,17 +176,6 @@ function renderState() {
   $('v-tier').textContent = s.moodTier;
   $('v-tier').className = tierClass(s.moodTier);
   $('v-rest').textContent = s.resting ? '休息中…' : '';
-}
-
-function renderTodos(items) {
-  const ul = $('todos');
-  if (!items.length) { ul.innerHTML = '<li class="dim">没有未完成待办</li>'; return; }
-  const color = { 10: '#8b949e', 20: '#6cb6ff', 30: '#dc8850', 40: '#f47067' };
-  ul.innerHTML = items.map((t) =>
-    `<li><span style="color:${color[t.priority] || '#fff'}">●</span> [${t.priority}] ${t.subject}` +
-    (t.dueTime ? ` <span class="dim">截止 ${new Date(t.dueTime).toLocaleString('zh-CN')}</span>` : '') +
-    ` <button onclick="act('complete_todo',{taskId:'${t.taskId}'})">完成</button></li>`
-  ).join('');
 }
 
 function addEvent(msg) {
@@ -235,6 +239,17 @@ $('btn-dialog').onclick = () => {
   const text = $('dlg-text').value.trim();
   if (!text) return;
   send({ type: 'debug_ui', kind: 'dialog', portrait: $('dlg-portrait').value, text });
+};
+// 角色/界面显隐开关
+for (const target of ['qz', 'workers', 'boss', 'phone']) {
+  $('tg-' + target).onchange = (e) => send({ type: 'debug_ui', kind: 'toggle', target, show: e.target.checked });
+}
+// 手机消息推送
+$('btn-phone-msg').onclick = () => {
+  const text = $('pm-text').value.trim();
+  if (!text) return;
+  send({ type: 'debug_ui', kind: 'phone_msg', from: $('pm-from').value, text });
+  $('pm-text').value = '';
 };
 $('btn-manual').onclick = () => {
   const v = $('manual-dt').value; // "YYYY-MM-DDTHH:mm"

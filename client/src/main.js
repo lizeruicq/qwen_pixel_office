@@ -7,6 +7,7 @@ import { GameSocket } from './net/ws.js';
 import { initPanels } from './ui/panels.js';
 import { confirmPanel, rpgDialog } from './ui/dialogs.js';
 import { createBubble } from './ui/bubble.js';
+import { createPhone } from './ui/phone.js';
 
 const W = MAP.cols * TILE; // 352
 const H = MAP.rows * TILE; // 224
@@ -39,6 +40,8 @@ class OfficeScene extends Phaser.Scene {
       this.load.spritesheet(wkr.sprite, `/assets/${wkr.sprite}.png`, { frameWidth: 16, frameHeight: 24 });
       this.load.spritesheet(wkr.typing, `/assets/${wkr.typing}.png`, { frameWidth: 16, frameHeight: 24 });
     }
+    // 老板：4 方向行走表（16×24/帧），frame0=正面（面朝镜头/同事）
+    this.load.spritesheet('boss', '/assets/npcwalk.png', { frameWidth: 16, frameHeight: 24 });
     for (const o of OBJECTS) this.load.image('obj_' + o.key, `/assets/objects/${o.key}.png`);
   }
 
@@ -108,6 +111,12 @@ class OfficeScene extends Phaser.Scene {
         frameRate: 3, repeat: -1,
       });
     }
+    // 老板 idle：面朝下两帧轻微摆动（frame 0/1/2 均为正面朝向，仅腿部交替）
+    this.anims.create({
+      key: 'boss-idle',
+      frames: this.anims.generateFrameNumbers('boss', { frames: [0, 1, 0, 2] }),
+      frameRate: 2, repeat: -1,
+    });
 
     // ---------- 物件对象层（y-sort + 碰撞） ----------
     const furniture = this.physics.add.staticGroup();
@@ -153,6 +162,20 @@ class OfficeScene extends Phaser.Scene {
     }
     // 千仔气泡（紫色）
     this.qzBubble = createBubble({ qz: true });
+
+    // ---------- 老板：站在大屏幕旁，不移动，保持 idle ----------
+    this.boss = this.add.sprite(126, 92, 'boss').setOrigin(0.5, 1);
+    this.boss.setDepth(Math.round(92));
+    this.boss.anims.play('boss-idle', true);
+
+    // ---------- 手机界面（右下角，调试页控制开关/推消息） ----------
+    this.phone = createPhone();
+
+    // ---------- 角色/手机显隐（调试页 ui_toggle） ----------
+    this.setVisible('qz', true);
+    this.setVisible('workers', true);
+    this.setVisible('boss', true);
+    this.setVisible('phone', false); // 手机默认收起
 
     // ---------- 落座状态 ----------
     this.seat = null;          // 玩家当前落座的 SEAT 项
@@ -243,6 +266,26 @@ class OfficeScene extends Phaser.Scene {
   }
 
   /* ---------- 打卡 ---------- */
+
+  /* 角色/手机显隐（调试页 ui_toggle 驱动） */
+  setVisible(target, show) {
+    this.vis = this.vis || { qz: true, workers: true, boss: true, phone: false };
+    this.vis[target] = show;
+    if (target === 'qz') {
+      this.qz?.setVisible(show);
+      if (!show) this.qzBubble?.hide();
+      this.panels?.setQzVisible(show);
+    } else if (target === 'workers') {
+      for (const w of this.workers || []) {
+        w.spr.setVisible(show);
+        if (!show) w.bubble.hide();
+      }
+    } else if (target === 'boss') {
+      this.boss?.setVisible(show);
+    } else if (target === 'phone') {
+      this.phone?.setVisible(show);
+    }
+  }
 
   /* 烘焙窗外景画布骨架（只建纹理，实际像素在 setSky 里按时段重绘）。高 1.5 行（24px） */
   buildSky() {
@@ -400,34 +443,44 @@ class OfficeScene extends Phaser.Scene {
     $('v-off').textContent = this.wsOk ? '' : ' ｜ 离线';
   }
 
+  /* 千仔气泡：千仔隐藏时不弹 */
+  sayQz(text, ms) {
+    if (this.qz && this.qz.visible) this.qzBubble?.say(text, ms);
+  }
+
   onWs(msg) {
     this.panels?.handleWs(msg);
-    switch (msg.type) {
-      case 'state':
+    switch (msg.type) {      case 'state':
         this.floatDelta(msg.state);
         this.state = msg.state;
         this.renderHud();
         break;
       case 'todos':
         this.todoCount = msg.items.length;
-        this.qzBubble?.say(`你有 ${msg.items.length} 条待办`, 2800);
+        this.sayQz(`你有 ${msg.items.length} 条待办`, 2800);
         break;
       case 'game_event': {
         const p = msg.payload || {};
-        if (msg.kind === 'at_me') this.qzBubble?.say(`${p.sender ?? '有人'} @ 你了`, 3200);
-        else if (msg.kind === 'o2o_msg') this.qzBubble?.say(`${p.sender ?? '有人'} 私聊你`, 3200);
-        else if (msg.kind === 'group_msg') this.qzBubble?.say(`${p.sender ?? '有人'} 在群里说话`, 2600);
-        else if (msg.kind === 'todo_added') this.qzBubble?.say('你有新的待办', 2800);
+        if (msg.kind === 'at_me') this.sayQz(`${p.sender ?? '有人'} @ 你了`, 3200);
+        else if (msg.kind === 'o2o_msg') this.sayQz(`${p.sender ?? '有人'} 私聊你`, 3200);
+        else if (msg.kind === 'group_msg') this.sayQz(`${p.sender ?? '有人'} 在群里说话`, 2600);
+        else if (msg.kind === 'todo_added') this.sayQz('你有新的待办', 2800);
         break;
       }
       case 'notice':
-        this.qzBubble?.say(msg.text, 3000);
+        this.sayQz(msg.text, 3000);
         break;
       case 'ui_panel': // 调试页触发的确认面板
         void confirmPanel({ image: msg.image || undefined, text: msg.text || '' });
         break;
       case 'ui_dialog': // 调试页触发的 RPG 对话
         void rpgDialog({ portrait: msg.portrait || undefined, text: msg.text || '' });
+        break;
+      case 'ui_toggle': // 调试页控制角色/手机显隐
+        this.setVisible(msg.target, msg.show);
+        break;
+      case 'ui_phone_msg': // 调试页往手机推一条消息
+        this.phone?.push(msg.from, msg.text || '');
         break;
       case 'time':
         this.clockInfo = { now: msg.now, phase: msg.phase, mode: msg.mode, at: performance.now() };
@@ -530,15 +583,16 @@ class OfficeScene extends Phaser.Scene {
       this.renderClock();
     }
 
-    // ---------- 千仔：自主慢速漫步（玩家不可控制） ----------
-    if (!this.qzTarget && this.time.now >= this.qzNextWanderAt) {
+    // ---------- 千仔：自主慢速漫步（玩家不可控制，隐藏时停走） ----------
+    const qzOn = this.qz.visible;
+    if (qzOn && !this.qzTarget && this.time.now >= this.qzNextWanderAt) {
       const r = QZ_REGIONS[Phaser.Math.Between(0, QZ_REGIONS.length - 1)];
       this.qzTarget = {
         x: Phaser.Math.Between(r.x1, r.x2),
         y: Phaser.Math.Between(r.y1, r.y2),
       };
     }
-    if (this.qzTarget) {
+    if (qzOn && this.qzTarget) {
       const dx = this.qzTarget.x - this.qz.x;
       const dy = this.qzTarget.y - this.qz.y;
       const dist = Math.hypot(dx, dy);
@@ -556,19 +610,21 @@ class OfficeScene extends Phaser.Scene {
         this.qz.anims.play('qz-walk-' + nd, true);
       }
     }
-    this.qz.setDepth(Math.round(this.qz.y));
+    if (qzOn) this.qz.setDepth(Math.round(this.qz.y));
 
-    // ---------- 同事：随机工作吐槽气泡 + 始终打字 ----------
+    // ---------- 同事：随机工作吐槽气泡 + 始终打字（隐藏时跳过） ----------
     for (const w of this.workers) {
-      if (this.time.now >= w.nextChatterAt) {
-        w.nextChatterAt = this.time.now + 7000 + Math.random() * 9000;
-        if (!w.bubble.visible) {
-          w.bubble.say(this.CHATTER[Phaser.Math.Between(0, this.CHATTER.length - 1)], 3400);
+      if (w.spr.visible) {
+        if (this.time.now >= w.nextChatterAt) {
+          w.nextChatterAt = this.time.now + 7000 + Math.random() * 9000;
+          if (!w.bubble.visible) {
+            w.bubble.say(this.CHATTER[Phaser.Math.Between(0, this.CHATTER.length - 1)], 3400);
+          }
         }
+        w.bubble.follow(w.spr, this.cameras.main);
       }
-      w.bubble.follow(w.spr, this.cameras.main);
     }
-    this.qzBubble.follow(this.qz, this.cameras.main);
+    if (qzOn) this.qzBubble.follow(this.qz, this.cameras.main);
   }
 }
 

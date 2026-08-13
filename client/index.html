@@ -89,14 +89,40 @@
       100% { opacity: 0; transform: translateY(-18px); }
     }
 
-    /* ---------- 抽屉 ---------- */
+    /* ---------- 抽屉（平板电脑外壳：显示屏 + 机身） ---------- */
     #drawer {
-      position: fixed; top: 12px; right: 12px; bottom: 12px; width: 420px; z-index: 20;
+      position: fixed; top: 12px; right: 12px; bottom: 12px; width: 460px; z-index: 20;
       display: flex; flex-direction: column; overflow: hidden;
       font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; color: var(--px-ink);
       transition: transform .25s ease;
+      /* 平板机身：深色圆角外壳 + 厚边框 + 高光 */
+      background: #16181d;
+      border: 3px solid #2a2e38;
+      border-radius: 22px;
+      box-shadow: 0 0 0 3px #05070a, 0 10px 34px rgba(0,0,0,.55),
+        inset 0 2px 0 rgba(255,255,255,.06);
+      padding: 26px 14px 14px; /* 顶部留摄像头带，其余为边框厚度 */
     }
     #drawer.closed { transform: translateX(calc(100% + 32px)); }
+    /* 前置摄像头 */
+    #drawer::before {
+      content: ''; position: absolute; top: 11px; left: 50%; transform: translateX(-50%);
+      width: 8px; height: 8px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #3d4451 0 30%, #05070a 70%);
+      box-shadow: 0 0 0 2px #05070a; pointer-events: none;
+    }
+    /* 侧边 Home 键 */
+    #drawer::after {
+      content: ''; position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+      width: 5px; height: 34px; border-radius: 3px; background: #2a2e38;
+      box-shadow: inset 0 0 0 1px #05070a; pointer-events: none;
+    }
+    /* 显示屏：面板内容都在这层里 */
+    #drawer .screen {
+      flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+      background: var(--px-bg); border: 2px solid #05070a; border-radius: 8px;
+      box-shadow: inset 0 0 0 1px #2a2e38, inset 0 0 24px rgba(0,0,0,.35);
+    }
     #drawer-tabs { display: flex; gap: 4px; padding: 10px 10px 8px; }
     #drawer-tabs button { color: var(--px-dim); background: #241d30; }
     #drawer-tabs button.active { background: #316dca; color: #fff; }
@@ -161,33 +187,34 @@
     <div id="meta">金币 <b id="v-coins">0</b> ｜ Lv<span id="v-level">1</span> ｜ <span id="v-tier">开心</span><span id="v-off"></span></div>
     <div id="clock-row"><span id="v-phase">--</span> <span id="v-clock">--:--</span><span id="v-clock-mode" class="dim"></span></div>
   </div>
-  <div id="drawer" class="pixel-frame closed">
-    <div id="drawer-tabs">
-      <button data-tab="messages">消息</button>
-      <button data-tab="tasks">待办</button>
-      <button data-tab="events">事件</button>
-      <button data-tab="secretary">千仔</button>
-      <button id="drawer-close">✕</button>
-    </div>
-    <div id="draft-bar" hidden><span id="draft-text"></span><span><button id="draft-ok" class="primary">确认</button> <button id="draft-no">取消</button></span></div>
-    <div id="pane-messages" class="pane">
-      <div id="conv-list"></div>
-      <div id="msg-quick" class="chips"></div>
-      <div id="ai-line" class="dim"></div>
-      <div id="msg-list" class="scroll"></div>
-      <div class="row"><input id="msg-input" placeholder="回复当前会话…（Enter 发送）" /><button id="msg-send" class="primary">发送</button></div>
-    </div>
-    <div id="pane-tasks" class="pane" hidden>
-      <div id="task-list" class="scroll"></div>
-      <div class="row"><button id="task-refresh">刷新</button></div>
-    </div>
-    <div id="pane-events" class="pane" hidden>
-      <div id="event-list" class="scroll"></div>
-    </div>
-    <div id="pane-secretary" class="pane" hidden>
-      <div id="sec-quick" class="chips"></div>
-      <div id="sec-log" class="scroll"></div>
-      <div class="row"><input id="sec-input" placeholder="让千仔来帮忙…（Enter 发送）" /><button id="sec-send" class="primary">发送</button></div>
+  <div id="drawer" class="closed">
+    <div class="screen">
+      <div id="drawer-tabs">
+        <button data-tab="messages">消息</button>
+        <button data-tab="tasks">待办</button>
+        <button data-tab="events">事件</button>
+        <button data-tab="secretary">千仔</button>
+        <button id="drawer-close">✕</button>
+      </div>
+      <div id="draft-bar" hidden><span id="draft-text"></span><span><button id="draft-ok" class="primary">确认</button> <button id="draft-no">取消</button></span></div>
+      <div id="pane-messages" class="pane">
+        <div id="conv-list"></div>
+        <div id="ai-line" class="dim"></div>
+        <div id="msg-list" class="scroll"></div>
+        <div class="row"><input id="msg-input" placeholder="回复当前会话…（Enter 发送）" /><button id="msg-send" class="primary">发送</button></div>
+      </div>
+      <div id="pane-tasks" class="pane" hidden>
+        <div id="task-list" class="scroll"></div>
+        <div class="row"><button id="task-refresh">刷新</button></div>
+      </div>
+      <div id="pane-events" class="pane" hidden>
+        <div id="event-list" class="scroll"></div>
+      </div>
+      <div id="pane-secretary" class="pane" hidden>
+        <div id="sec-quick" class="chips"></div>
+        <div id="sec-log" class="scroll"></div>
+        <div class="row"><input id="sec-input" placeholder="让千仔来帮忙…（Enter 发送）" /><button id="sec-send" class="primary">发送</button></div>
+      </div>
     </div>
   </div>
   <script type="module" src="/src/main.js"></script>
