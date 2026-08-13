@@ -38,6 +38,9 @@
   .tag.o2o_msg { background: #24461f; color: #8ddb8c; }
   .tag.todo_added,.tag.todo_done,.tag.todo_near_due,.tag.todo_overdue { background: #43341c; color: #eac54f; }
   .dim { color: #636e7b; }
+  .clock-strip { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .clock-strip input { width: auto; flex: 0 1 170px; margin: 0; padding: 3px 6px; font-size: 11px; }
+  .clock-strip button { margin: 0; padding: 3px 8px; font-size: 11px; }
   .toggles { display: flex; flex-direction: column; gap: 6px; }
   .toggles label { display: flex; align-items: center; gap: 6px; cursor: pointer; color: #adbac7; }
   .toggles input[type=checkbox] { width: auto; margin: 0; accent-color: #316dca; }
@@ -64,12 +67,11 @@
       <span>今日完成 <span id="v-done">0</span></span>
     </div>
     <div class="kv">心情档位：<span class="tier" id="v-tier">-</span>　<span class="dim" id="v-rest"></span></div>
-    <h2 style="margin-top:16px">时钟</h2>
-    <div class="kv">当前：<b id="v-clock-now">-</b>　<span class="dim" id="v-clock-phase"></span>　<span class="dim" id="v-clock-mode"></span></div>
-    <button id="btn-natural">使用自然时间</button>
-    <div style="margin-top:6px">
+    <div class="kv clock-strip">
+      <span class="dim">时钟</span><b id="v-clock-now">-</b><span class="dim" id="v-clock-phase"></span><span class="dim" id="v-clock-mode"></span>
+      <button id="btn-natural" title="切回自然时间">自然</button>
       <input id="manual-dt" type="datetime-local" step="60">
-      <button class="primary" id="btn-manual">设为人工时间</button>
+      <button class="primary" id="btn-manual">设定</button>
     </div>
     <h2 style="margin-top:16px">AI 千仔</h2>
     <input id="chat" placeholder="自然语言指令（需配置 LLM）" onkeydown="if(event.key==='Enter')chat()">
@@ -102,11 +104,10 @@
 
     <h2 style="margin-top:16px">对话框弹出（游戏内）</h2>
     <select id="dlg-portrait">
-      <optgroup label="角色胸像">
-        <option value="key:主角">主角（胸像）</option>
-        <option value="key:老板">老板（胸像）</option>
-        <option value="key:小蓝">小蓝·同事（胸像）</option>
-        <option value="key:小橙">小橙·同事（胸像）</option>
+      <optgroup label="角色头像（PNG）">
+        <option value="/assets/portrait_char_boss.png">老板</option>
+        <option value="/assets/portrait_char_xiaolan.png">小蓝·同事</option>
+        <option value="/assets/portrait_char_xiaocheng.png">小橙·同事</option>
       </optgroup>
       <optgroup label="主角状态图">
         <option value="/assets/portrait_normal.png">正常</option>
@@ -136,6 +137,7 @@
 
     <h2 style="margin-top:16px">头顶气泡（游戏内）</h2>
     <select id="bb-target">
+      <option value="player">玩家</option>
       <option value="boss">老板</option>
       <option value="worker0">小蓝（同事）</option>
       <option value="worker1">小橙（同事）</option>
@@ -256,11 +258,7 @@ $('btn-panel').onclick = () => {
 $('btn-dialog').onclick = () => {
   const text = $('dlg-text').value.trim();
   if (!text) return;
-  const v = $('dlg-portrait').value;
-  const msg = { type: 'debug_ui', kind: 'dialog', text };
-  if (v.startsWith('key:')) msg.portraitKey = v.slice(4); // 角色胸像
-  else msg.portrait = v; // 图片路径
-  send(msg);
+  send({ type: 'debug_ui', kind: 'dialog', portrait: $('dlg-portrait').value, text });
 };
 // 角色/界面显隐开关
 for (const target of ['qz', 'workers', 'boss', 'phone']) {

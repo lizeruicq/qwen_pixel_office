@@ -183,14 +183,23 @@ export const SEATS = [
   { id: 'desk_br', deskX: 108, deskY: 150, seatX: 108, seatY: 164, faceDir: 'up', worker: 'worker1' },// 右下：同事1
 ];
 
-/** 两名常驻同事：始终在工位打字。sprite=行走/站立表，typing=打字表，name 用于对话 */
+/** 两名常驻同事：始终在工位打字。typing=打字表（也是落座显示的形象），name 用于对话，portrait=对话头像 PNG */
 export const WORKERS = [
-  { id: 'worker0', name: '小蓝', seatId: 'desk_bl', sprite: 'agent0', typing: 'agent_typing0' },
-  { id: 'worker1', name: '小橙', seatId: 'desk_br', sprite: 'agent1', typing: 'agent_typing1' },
+  { id: 'worker0', name: '小蓝', seatId: 'desk_bl', sprite: 'agent_typing1', typing: 'agent_typing1', portrait: '/assets/portrait_char_xiaolan.png' }, // 蓝衣
+  { id: 'worker1', name: '小橙', seatId: 'desk_br', sprite: 'agent_typing0', typing: 'agent_typing0', portrait: '/assets/portrait_char_xiaocheng.png' }, // 橙/红衣
 ];
 
 /** 老板：站在大屏幕旁，不移动，idle 面朝镜头。sprite=npcwalk（唯一有正面帧的表） */
-export const BOSS = { name: '老板', sprite: 'npcwalk', x: 126, y: 92 };
+export const BOSS = { name: '老板', sprite: 'npcwalk', x: 126, y: 92, portrait: '/assets/portrait_char_boss.png' };
+
+/** 玩家对话头像：按心情档位映射到现有 portrait_*.png */
+export const PLAYER_PORTRAITS = {
+  兴奋: '/assets/portrait_happy.png',
+  开心: '/assets/portrait_happy.png',
+  平静: '/assets/portrait_normal.png',
+  疲惫: '/assets/portrait_tired.png',
+  倦怠: '/assets/portrait_angry.png',
+};
 
 /** 光晕：[x, y, warm|cool] */
 export const GLOWS = [

@@ -190,7 +190,7 @@ export class PushServer {
         const m = msg as {
           type: 'debug_ui'; kind: 'panel' | 'dialog' | 'toggle' | 'phone_msg' | 'bubble';
           image?: string; portrait?: string; portraitKey?: string; text?: string;
-          target?: 'qz' | 'workers' | 'boss' | 'phone' | 'worker0' | 'worker1'; show?: boolean; from?: 'boss' | 'xiaomei';
+          target?: 'qz' | 'workers' | 'boss' | 'phone' | 'worker0' | 'worker1' | 'player'; show?: boolean; from?: 'boss' | 'xiaomei';
         };
         if (m.kind === 'panel') {
           this.broadcast({ type: 'ui_panel', image: String(m.image ?? ''), text: String(m.text ?? '') });
