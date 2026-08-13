@@ -14,7 +14,8 @@ import type { GameState } from '../game/state.js';
 import type { TodoPoller } from '../bridge/todo-poller.js';
 import type { ToolContext } from '../agent/tools.js';
 import { executeTool, type ConfirmDriver } from '../agent/executor.js';
-import { runAgentFlow } from '../agent/agent-flow.js';
+import { runAgentChat } from '../agent/agent-flow.js';
+import type { ChatMessage } from '../agent/llm.js';
 import { log } from '../log.js';
 import type { ClientMessage } from '../shared/types.js';
 import type { Clock } from '../game/clock.js';
@@ -37,6 +38,8 @@ export class PushServer {
   private pending = new Map<string, (approved: boolean) => void>();
   /** 每个连接当前正在运行的 AI 流程的中断器 */
   private agentAborters = new Map<WebSocket, AbortController>();
+  /** 每个连接的千仔对话历史（会话记忆）：连接断开（刷新页面）即清空 */
+  private chatHistories = new Map<WebSocket, ChatMessage[]>();
   private server: http.Server;
 
   constructor(
@@ -67,6 +70,7 @@ export class PushServer {
         this.clients.delete(ws);
         this.agentAborters.get(ws)?.abort();
         this.agentAborters.delete(ws);
+        this.chatHistories.delete(ws); // 连接断开 → 清空千仔会话记忆
       });
       log('ws', `客户端连接，当前 ${this.clients.size} 个`);
     });
@@ -215,8 +219,14 @@ export class PushServer {
         this.agentAborters.get(ws)?.abort();
         const aborter = new AbortController();
         this.agentAborters.set(ws, aborter);
+        // 取/建本连接的对话历史（会话记忆）
+        let history = this.chatHistories.get(ws);
+        if (!history) {
+          history = [];
+          this.chatHistories.set(ws, history);
+        }
         try {
-          await runAgentFlow(String(msg.text ?? ''), cfg, toolCtx, this.wsDriver(ws), {
+          await runAgentChat(String(msg.text ?? ''), history, cfg, toolCtx, this.wsDriver(ws), {
             text: (t) => this.send(ws, { type: 'agent_card', stage: 'result', text: t }),
             toolStart: (name, args) => this.send(ws, { type: 'agent_card', stage: 'tool', tool: name, text: JSON.stringify(args) }),
           }, aborter.signal);
