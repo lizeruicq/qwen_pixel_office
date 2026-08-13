@@ -185,6 +185,18 @@ export class PushServer {
         }
         return;
       }
+      if (msg.type === 'debug_ui') {
+        // 调试页请求游戏窗口弹面板/对话：直接广播给所有客户端，由游戏前端渲染
+        const m = msg as { type: 'debug_ui'; kind: 'panel' | 'dialog'; image?: string; portrait?: string; text: string };
+        if (m.kind === 'panel') {
+          this.broadcast({ type: 'ui_panel', image: String(m.image ?? ''), text: String(m.text ?? '') });
+          log('debug', `调试面板：${String(m.text ?? '').slice(0, 24)}`);
+        } else if (m.kind === 'dialog') {
+          this.broadcast({ type: 'ui_dialog', portrait: String(m.portrait ?? ''), text: String(m.text ?? '') });
+          log('debug', `调试对话：${String(m.text ?? '').slice(0, 24)}`);
+        }
+        return;
+      }
       if (msg.type === 'agent_chat') {
         // 若已有在跑的流程，先中断再开新的（防御；正常前端会在思考中锁定输入）
         this.agentAborters.get(ws)?.abort();

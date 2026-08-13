@@ -26,6 +26,7 @@
   button.primary { background: #316dca; border-color: #4184e4; }
   button.danger { background: #8b2c34; border-color: #b04550; }
   input { background: #14161a; border: 1px solid #3d4451; color: #d8dee6; border-radius: 6px; padding: 6px 8px; font-family: inherit; font-size: 12px; width: 100%; margin: 3px 0; }
+  select { background: #14161a; border: 1px solid #3d4451; color: #d8dee6; border-radius: 6px; padding: 6px 8px; font-family: inherit; font-size: 12px; width: 100%; margin: 3px 0; }
   ul { list-style: none; margin: 0; padding: 0; }
   li { padding: 5px 6px; border-bottom: 1px solid #23272f; word-break: break-all; }
   li:last-child { border-bottom: none; }
@@ -60,7 +61,6 @@
       <span>今日完成 <span id="v-done">0</span></span>
     </div>
     <div class="kv">心情档位：<span class="tier" id="v-tier">-</span>　<span class="dim" id="v-rest"></span></div>
-    <button id="btn-rest">开始休息</button>
     <h2 style="margin-top:16px">时钟</h2>
     <div class="kv">当前：<b id="v-clock-now">-</b>　<span class="dim" id="v-clock-phase"></span>　<span class="dim" id="v-clock-mode"></span></div>
     <button id="btn-natural">使用自然时间</button>
@@ -68,11 +68,6 @@
       <input id="manual-dt" type="datetime-local" step="60">
       <button class="primary" id="btn-manual">设为人工时间</button>
     </div>
-    <h2 style="margin-top:16px">操作</h2>
-    <button onclick="act('list_todos')">看待办</button>
-    <button onclick="completeTodo()">完成待办</button>
-    <button onclick="createTodo()">新建待办</button>
-    <button onclick="sendGroup()">发群消息</button>
     <h2 style="margin-top:16px">AI 千仔</h2>
     <input id="chat" placeholder="自然语言指令（需配置 LLM）" onkeydown="if(event.key==='Enter')chat()">
     <button class="primary" onclick="chat()">发送</button>
@@ -93,7 +88,26 @@
       <button class="primary" id="adj-add">＋加</button>
       <button class="danger" id="adj-sub">－减</button>
     </div>
-    <h2>待办列表</h2>
+
+    <h2>面板弹出（游戏内）</h2>
+    <select id="panel-img">
+      <option value="/assets/objects/time_clock.png">打卡机</option>
+      <option value="/assets/objects/coffee_machine.png">咖啡机</option>
+    </select>
+    <input id="panel-text" placeholder="面板文字">
+    <button class="primary" id="btn-panel">弹出面板</button>
+
+    <h2 style="margin-top:16px">对话框弹出（游戏内）</h2>
+    <select id="dlg-portrait">
+      <option value="/assets/portrait_normal.png">主角·正常</option>
+      <option value="/assets/portrait_happy.png">主角·开心</option>
+      <option value="/assets/portrait_tired.png">主角·疲惫</option>
+      <option value="/assets/portrait_angry.png">主角·生气</option>
+    </select>
+    <input id="dlg-text" placeholder="对话文字">
+    <button class="primary" id="btn-dialog">弹出对话框</button>
+
+    <h2 style="margin-top:16px">待办列表</h2>
     <ul id="todos"><li class="dim">等待数据…</li></ul>
   </section>
 
@@ -147,7 +161,6 @@ function renderState() {
   $('v-tier').textContent = s.moodTier;
   $('v-tier').className = tierClass(s.moodTier);
   $('v-rest').textContent = s.resting ? '休息中…' : '';
-  $('btn-rest').textContent = s.resting ? '结束休息' : '开始休息';
 }
 
 function renderTodos(items) {
@@ -204,14 +217,6 @@ function addCard(msg) {
 function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
 function act(name, params) { send({ type: 'action', name, params: params || {} }); }
 function chat() { const el = $('chat'); if (!el.value.trim()) return; send({ type: 'agent_chat', text: el.value.trim() }); el.value = ''; }
-function completeTodo() { const s = prompt('待办标题关键词或 taskId:'); if (s) act('complete_todo', /^\d+$/.test(s) ? { taskId: s } : { subject: s }); }
-function createTodo() { const t = prompt('新待办标题:'); if (t) act('create_todo', { title: t }); }
-function sendGroup() {
-  const g = prompt('群名关键词:'); if (!g) return;
-  const t = prompt('消息内容:'); if (!t) return;
-  act('send_group_message', { group: g, text: t });
-}
-$('btn-rest').onclick = () => { act(state && state.resting ? 'rest_stop' : 'rest_start'); };
 $('btn-natural').onclick = () => send({ type: 'set_time', mode: 'natural' });
 function adjust(sign) {
   const stat = $('adj-stat').value;
@@ -221,6 +226,16 @@ function adjust(sign) {
 }
 $('adj-add').onclick = () => adjust(1);
 $('adj-sub').onclick = () => adjust(-1);
+$('btn-panel').onclick = () => {
+  const text = $('panel-text').value.trim();
+  if (!text) return;
+  send({ type: 'debug_ui', kind: 'panel', image: $('panel-img').value, text });
+};
+$('btn-dialog').onclick = () => {
+  const text = $('dlg-text').value.trim();
+  if (!text) return;
+  send({ type: 'debug_ui', kind: 'dialog', portrait: $('dlg-portrait').value, text });
+};
 $('btn-manual').onclick = () => {
   const v = $('manual-dt').value; // "YYYY-MM-DDTHH:mm"
   if (!v) { $('v-clock-mode').textContent = '（请先选择日期时间）'; return; }

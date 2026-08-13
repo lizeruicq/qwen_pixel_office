@@ -423,6 +423,12 @@ class OfficeScene extends Phaser.Scene {
       case 'notice':
         this.qzBubble?.say(msg.text, 3000);
         break;
+      case 'ui_panel': // 调试页触发的确认面板
+        void confirmPanel({ image: msg.image || undefined, text: msg.text || '' });
+        break;
+      case 'ui_dialog': // 调试页触发的 RPG 对话
+        void rpgDialog({ portrait: msg.portrait || undefined, text: msg.text || '' });
+        break;
       case 'time':
         this.clockInfo = { now: msg.now, phase: msg.phase, mode: msg.mode, at: performance.now() };
         this.renderClock();

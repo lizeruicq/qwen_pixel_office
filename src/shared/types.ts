@@ -78,7 +78,9 @@ export type ServerMessage =
       text?: string;
     }
   | { type: 'notice'; text: string; ts: number }
-  | { type: 'time'; mode: 'natural' | 'manual'; now: number; phase: string; ts: number };
+  | { type: 'time'; mode: 'natural' | 'manual'; now: number; phase: string; ts: number }
+  | { type: 'ui_panel'; image: string; text: string }   // 调试：游戏内弹确认面板
+  | { type: 'ui_dialog'; portrait: string; text: string }; // 调试：游戏内弹 RPG 对话
 
 /** client→server 请求消息 */
 export type ClientMessage =
@@ -88,4 +90,5 @@ export type ClientMessage =
   | { type: 'agent_chat'; text: string }
   | { type: 'agent_cancel' }
   | { type: 'set_time'; mode: 'natural' | 'manual'; ms?: number }
-  | { type: 'adjust_stat'; stat: 'energy' | 'mood' | 'focus' | 'coins'; delta: number };
+  | { type: 'adjust_stat'; stat: 'energy' | 'mood' | 'focus' | 'coins'; delta: number }
+  | { type: 'debug_ui'; kind: 'panel' | 'dialog'; image?: string; portrait?: string; text: string };
