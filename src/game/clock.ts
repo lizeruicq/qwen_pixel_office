@@ -29,8 +29,8 @@ export function phaseOf(ms: number): string {
   const h = new Date(ms).getHours();
   if (h >= 5 && h < 9) return '清晨';
   if (h >= 9 && h < 12) return '上午';
-  if (h >= 12 && h < 18) return '下午';
-  if (h >= 18 && h < 22) return '傍晚';
+  if (h >= 12 && h < 17) return '下午';
+  if (h >= 17 && h < 22) return '傍晚';
   return '深夜'; // 22:00–5:00
 }
 
