@@ -203,12 +203,14 @@ class OfficeScene extends Phaser.Scene {
       const wp = this.cameras.main.getWorldPoint(p.x, p.y);
       for (const t of PANEL_TRIGGERS) {
         if (wp.x >= t.x - t.w / 2 && wp.x <= t.x + t.w / 2 && wp.y >= t.y - t.h && wp.y <= t.y) {
-          this.panels?.openTab(t.tab);
+          // 千仔隐藏时，秘书白板不展示千仔页，回落到待办页
+          const tab = (t.tab === 'secretary' && !this.qz?.visible) ? 'tasks' : t.tab;
+          this.panels?.openTab(tab);
           return;
         }
       }
-      // 点击千仔 → 秘书面板（玩家不被控制移动）
-      if (Math.abs(wp.x - this.qz.x) <= 10 && wp.y <= this.qz.y + 2 && wp.y >= this.qz.y - 18) {
+      // 点击千仔 → 秘书面板（仅千仔可见时；玩家不被控制移动）
+      if (this.qz?.visible && Math.abs(wp.x - this.qz.x) <= 10 && wp.y <= this.qz.y + 2 && wp.y >= this.qz.y - 18) {
         this.panels?.openTab('secretary');
         return;
       }

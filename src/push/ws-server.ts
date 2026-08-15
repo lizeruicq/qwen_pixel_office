@@ -193,7 +193,8 @@ export class PushServer {
       }
       if (msg.type === 'action') {
         const result = await executeTool(msg.name, msg.params ?? {}, toolCtx, this.wsDriver(ws));
-        this.send(ws, { type: 'agent_card', stage: 'result', tool: msg.name, text: `[${result.status}] ${result.text}` });
+        // 直连操作（非千仔对话）→ 用 action_result 回执，前端进事件流而非千仔聊天
+        this.send(ws, { type: 'action_result', tool: msg.name, status: result.status, text: result.text });
         this.broadcastState();
         return;
       }

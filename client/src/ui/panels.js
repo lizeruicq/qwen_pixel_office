@@ -11,6 +11,7 @@ export function initPanels(socket) {
   let tab = 'messages';
   let curConv = null;
   let draftReq = null;
+  let qzVisible = true; // 千仔是否可见（隐藏时不允许打开千仔面板）
   const convs = [];
 
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -29,6 +30,7 @@ export function initPanels(socket) {
   }
 
   function openTab(t) {
+    if (t === 'secretary' && !qzVisible) t = 'tasks'; // 千仔隐藏时打不开千仔页，落到待办
     tab = t;
     for (const b of document.querySelectorAll('#drawer-tabs [data-tab]')) {
       b.classList.toggle('active', b.dataset.tab === t);
@@ -41,6 +43,7 @@ export function initPanels(socket) {
 
   /* 千仔显隐（调试页控制）：隐藏时移除秘书 tab，若正开着则切走 */
   function setQzVisible(show) {
+    qzVisible = show;
     const btn = document.querySelector('#drawer-tabs [data-tab="secretary"]');
     if (btn) btn.hidden = !show;
     if (!show && tab === 'secretary') setOpen(false);
@@ -271,6 +274,9 @@ export function initPanels(socket) {
       }
       case 'notice':
         addEvent('notice', msg.text);
+        break;
+      case 'action_result': // 直连工具操作（回复/完成/评论待办等）→ 进事件流，不进千仔聊天
+        addEvent('action', `[${msg.status}] ${msg.text ?? ''}`);
         break;
       case 'todos':
         renderTasks(msg.items);

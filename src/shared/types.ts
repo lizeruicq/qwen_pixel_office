@@ -78,6 +78,7 @@ export type ServerMessage =
       text?: string;
     }
   | { type: 'notice'; text: string; ts: number }
+  | { type: 'action_result'; tool: string; status: 'ok' | 'rejected' | 'error'; text: string } // 直连工具操作结果（与千仔无关，不进千仔聊天）
   | { type: 'time'; mode: 'natural' | 'manual'; now: number; phase: string; paused: boolean; ts: number }
   | { type: 'ui_panel'; image: string; text: string }   // 调试：游戏内弹确认面板
   | { type: 'ui_dialog'; portrait?: string; portraitKey?: string; text: string } // 调试：游戏内弹 RPG 对话（portrait=图片路径 / portraitKey=角色胸像）
