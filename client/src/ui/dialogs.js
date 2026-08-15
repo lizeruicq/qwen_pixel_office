@@ -35,13 +35,13 @@ function injectStyles() {
     .dlg-btns button.primary { background: #316dca; }
 
     .dlg-rpg {
-      position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 40;
-      width: min(520px, 92vw); padding: 12px 14px; display: flex; align-items: center; gap: 12px; cursor: pointer;
+      position: fixed; left: 50%; bottom: clamp(48px, 9vh, 120px); transform: translateX(-50%); z-index: 40;
+      width: min(1080px, 92vw); padding: 20px 24px; display: flex; align-items: center; gap: 20px; cursor: pointer;
       background: #1a1626; border: 4px solid #5e3a1e; box-shadow: 0 0 0 4px #2a1a0e, inset 0 0 0 4px #8d5f33;
       font-family: ui-monospace, Menlo, monospace; color: #d8dee6;
     }
-    .dlg-rpg img { width: 64px; height: 64px; flex: 0 0 64px; image-rendering: pixelated; border: 2px solid #0b0d10; background: #2a2e38; }
-    .dlg-rpg .dlg-rpg-text { font-size: 14px; line-height: 1.6; flex: 1; white-space: pre-wrap; }
+    .dlg-rpg img { width: 96px; height: 96px; flex: 0 0 96px; image-rendering: pixelated; border: 2px solid #0b0d10; background: #2a2e38; }
+    .dlg-rpg .dlg-rpg-text { font-size: 22px; line-height: 1.7; flex: 1; white-space: pre-wrap; }
     .dlg-rpg .dlg-rpg-text::after { content: ' ▼'; color: #8b949e; animation: dlg-blink 1s steps(2) infinite; }
     @keyframes dlg-blink { 50% { opacity: 0; } }
   `;

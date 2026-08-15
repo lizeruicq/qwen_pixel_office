@@ -398,7 +398,7 @@ class OfficeScene extends Phaser.Scene {
   /* ---------- 喝咖啡（任何时候可用，逻辑同打卡机） ---------- */
   async tryCoffee() {
     const yes = await confirmPanel({
-      image: '/assets/objects/coffee_machine.png',
+      image: '/assets/objects/doubao_coffeemachine.jpg',
       text: '要来一杯咖啡提提神吗？',
       yesText: '来一杯', noText: '算了',
     });
