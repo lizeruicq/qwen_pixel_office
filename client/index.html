@@ -6,8 +6,9 @@
   <title>像素办公室</title>
   <style>
     html, body { margin: 0; padding: 0; height: 100%; background: #10131a; overflow: hidden; }
-    #game { width: 100vw; height: 100vh; }
-    canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+    /* 画布外空余兜底：像素大理石地面（块面大小由 JS 随画布缩放同步，观感为办公室外地面） */
+    #game { width: 100vw; height: 100vh; background: #10131a url('/assets/marble.png') repeat; image-rendering: pixelated; }
+    canvas { image-rendering: pixelated; image-rendering: crisp-edges; box-shadow: 0 0 0 4px #0b0d10, 0 0 24px rgba(0,0,0,.5); }
 
     /* ---------- 像素风通用 ---------- */
     :root {

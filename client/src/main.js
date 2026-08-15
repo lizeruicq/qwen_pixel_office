@@ -699,3 +699,15 @@ new Phaser.Game({
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   scene: OfficeScene,
 });
+
+// ---------- 空余兜底：大理石地面贴图，块面随画布 FIT 缩放同步，任何窗口尺寸下都像办公室外的地面 ----------
+{
+  const el = document.getElementById('game');
+  const syncMarble = () => {
+    // marble.png 为 32px（2 块 16px 石板），与画布内 TILE 同比例放大
+    const s = 32 * Math.min(window.innerWidth / W, window.innerHeight / H);
+    el.style.backgroundSize = `${s}px ${s}px`;
+  };
+  window.addEventListener('resize', syncMarble);
+  syncMarble();
+}
