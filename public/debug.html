@@ -45,6 +45,8 @@
   .toggles label { display: flex; align-items: center; gap: 6px; cursor: pointer; color: #adbac7; }
   .toggles input[type=checkbox] { width: auto; margin: 0; accent-color: #316dca; }
   .tier { font-weight: bold; }
+  .sim-box { border: 1px solid #2a2e38; border-radius: 6px; padding: 10px; margin-bottom: 12px; background: #181b21; }
+  .sim-title { font-size: 11px; color: #8b949e; letter-spacing: 1px; margin-bottom: 6px; }
   .tier-兴奋 { color: #eac54f; } .tier-开心 { color: #8ddb8c; } .tier-平静 { color: #6cb6ff; } .tier-疲惫 { color: #dc8850; } .tier-倦怠 { color: #f47067; }
 </style>
 </head>
@@ -151,6 +153,19 @@
 
   <section>
     <h2>事件流</h2>
+    <div class="sim-box">
+      <div class="sim-title">模拟时间流（触发一条事件）</div>
+      <select id="sim-event">
+        <option value="qz_reply">千仔回复</option>
+        <option value="at_me">有人 @ 我</option>
+        <option value="o2o_msg">私聊消息</option>
+        <option value="group_msg">群消息</option>
+        <option value="todo_added">新待办</option>
+      </select>
+      <input id="sim-sender" placeholder="触发人（可选，如 老板）">
+      <input id="sim-text" placeholder="事件内容 / 千仔回复文字">
+      <button class="primary" id="btn-sim">触发事件</button>
+    </div>
     <ul id="events"></ul>
   </section>
 </main>
@@ -173,6 +188,12 @@ function route(msg) {
     case 'agent_card': addCard(msg); break;
     case 'notice': addEvent({ kind: 'notice', payload: { text: msg.text }, ts: msg.ts }); break;
     case 'time': renderClock(msg); break;
+    case 'ui_visibility': { // 后端下发当前显隐状态 → 同步勾选框（刷新后恢复）
+      const vis = msg.vis || {};
+      for (const k of Object.keys(vis)) { const cb = $('tg-' + k); if (cb) cb.checked = !!vis[k]; }
+      break;
+    }
+    case 'sim_event': addEvent({ kind: 'sim', payload: { text: `[模拟] ${msg.event}${msg.text ? '：' + msg.text : ''}` }, ts: msg.ts }); break;
   }
 }
 
@@ -279,6 +300,14 @@ $('btn-bubble').onclick = () => {
   if (!text) return;
   send({ type: 'debug_ui', kind: 'bubble', target: $('bb-target').value, text });
   $('bb-text').value = '';
+};
+// 模拟时间流事件
+$('btn-sim').onclick = () => {
+  const event = $('sim-event').value;
+  const text = $('sim-text').value.trim();
+  const sender = $('sim-sender').value.trim();
+  send({ type: 'debug_ui', kind: 'sim_event', event, text, sender });
+  $('sim-text').value = '';
 };
 $('btn-manual').onclick = () => {
   const v = $('manual-dt').value; // "YYYY-MM-DDTHH:mm"

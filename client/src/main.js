@@ -527,6 +527,22 @@ class OfficeScene extends Phaser.Scene {
       case 'ui_toggle': // 调试页控制角色/手机显隐
         this.setVisible(msg.target, msg.show);
         break;
+      case 'ui_visibility': { // 连接建立时后端下发当前显隐状态 → 刷新后恢复
+        const vis = msg.vis || {};
+        for (const k of Object.keys(vis)) this.setVisible(k, vis[k]);
+        break;
+      }
+      case 'sim_event': { // 调试页模拟时间流事件：按真实事件同样驱动千仔气泡
+        const sender = msg.sender || '有人';
+        const text = msg.text || '';
+        if (msg.event === 'qz_reply') this.sayQz(text || '我来帮你看看', 3600);
+        else if (msg.event === 'at_me') this.sayQz(`${sender} @ 你了${text ? '：' + text : ''}`, 3600);
+        else if (msg.event === 'o2o_msg') this.sayQz(`${sender} 私聊你${text ? '：' + text : ''}`, 3600);
+        else if (msg.event === 'group_msg') this.sayQz(`${sender} 在群里说话${text ? '：' + text : ''}`, 3000);
+        else if (msg.event === 'todo_added') this.sayQz(`你有新的待办${text ? '：' + text : ''}`, 3200);
+        else this.sayQz(text || '有新消息', 3000);
+        break;
+      }
       case 'ui_phone_msg': // 调试页往手机推一条消息
         this.phone?.push(msg.from, msg.text || '');
         break;

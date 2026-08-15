@@ -40,6 +40,8 @@ export class PushServer {
   private agentAborters = new Map<WebSocket, AbortController>();
   /** 每个连接的千仔对话历史（会话记忆）：连接断开（刷新页面）即清空 */
   private chatHistories = new Map<WebSocket, ChatMessage[]>();
+  /** 各角色/界面显隐状态（跨刷新保持，后端内存中），新连接建立时下发 */
+  private visibility: Record<string, boolean> = { qz: true, workers: true, boss: true, player: true, phone: false };
   private server: http.Server;
 
   constructor(
@@ -62,6 +64,7 @@ export class PushServer {
       this.send(ws, { type: 'hello', ts: Date.now() });
       this.send(ws, { type: 'state', state: this.deps.game.snapshot() });
       this.send(ws, { type: 'todos', items: this.deps.poller.list() });
+      this.send(ws, { type: 'ui_visibility', vis: this.visibility }); // 下发当前显隐状态，刷新后恢复
       this.sendTime(ws);
       ws.on('message', (data) => {
         void this.handleMessage(ws, data.toString());
@@ -192,9 +195,10 @@ export class PushServer {
       if (msg.type === 'debug_ui') {
         // 调试页控制游戏窗口：弹面板/对话、显隐角色、推手机消息 —— 广播给所有客户端渲染
         const m = msg as {
-          type: 'debug_ui'; kind: 'panel' | 'dialog' | 'toggle' | 'phone_msg' | 'bubble';
+          type: 'debug_ui'; kind: 'panel' | 'dialog' | 'toggle' | 'phone_msg' | 'bubble' | 'sim_event';
           image?: string; portrait?: string; portraitKey?: string; text?: string;
           target?: 'qz' | 'workers' | 'boss' | 'phone' | 'worker0' | 'worker1' | 'player'; show?: boolean; from?: 'boss' | 'xiaomei';
+          event?: string; sender?: string;
         };
         if (m.kind === 'panel') {
           this.broadcast({ type: 'ui_panel', image: String(m.image ?? ''), text: String(m.text ?? '') });
@@ -203,6 +207,7 @@ export class PushServer {
           this.broadcast({ type: 'ui_dialog', portrait: String(m.portrait ?? ''), portraitKey: m.portraitKey ? String(m.portraitKey) : undefined, text: String(m.text ?? '') });
           log('debug', `调试对话：${String(m.text ?? '').slice(0, 24)}`);
         } else if (m.kind === 'toggle' && m.target) {
+          this.visibility[m.target] = Boolean(m.show); // 记住显隐状态，供刷新后恢复
           this.broadcast({ type: 'ui_toggle', target: m.target, show: Boolean(m.show) });
           log('debug', `显隐 ${m.target} → ${m.show ? '显示' : '隐藏'}`);
         } else if (m.kind === 'phone_msg' && m.from) {
@@ -211,6 +216,10 @@ export class PushServer {
         } else if (m.kind === 'bubble' && m.target) {
           this.broadcast({ type: 'ui_bubble', target: m.target, text: String(m.text ?? '') });
           log('debug', `气泡 ${m.target}：${String(m.text ?? '').slice(0, 24)}`);
+        } else if (m.kind === 'sim_event' && m.event) {
+          // 模拟时间流：调试页触发一个事件，广播给游戏端按真实事件同样处理
+          this.broadcast({ type: 'sim_event', event: String(m.event), text: String(m.text ?? ''), sender: String(m.sender ?? ''), ts: Date.now() });
+          log('debug', `模拟事件 ${m.event}：${String(m.text ?? '').slice(0, 24)}`);
         }
         return;
       }

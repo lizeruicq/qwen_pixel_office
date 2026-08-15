@@ -641,9 +641,15 @@ export const TOOL_DEFS: ToolDef[] = [
           const cliArgs = ['doc', 'create', '--name', name];
           if (content) cliArgs.push('--content', content);
           if (folder) cliArgs.push('--folder', folder);
-          const res = await dwsJson<{ success?: boolean }>(ctx.dwsBin, cliArgs);
+          const res = await dwsJson<{ success?: boolean; nodeId?: string; url?: string; serverResponse?: unknown }>(ctx.dwsBin, cliArgs);
           if (res?.success === false) return `创建失败: ${JSON.stringify(res).slice(0, 300)}`;
-          return `已创建文档「${name}」。`;
+          // dws 在服务器未真正落库时也会返回 success:true 但 nodeId 为空 —— 必须校验真实文档ID
+          const nodeId = String(res?.nodeId ?? '').trim();
+          if (!nodeId) {
+            return `创建未生效：dws 返回 success 但没有文档ID（nodeId 为空），文档可能未真正创建。\n原始返回: ${JSON.stringify(res).slice(0, 400)}`;
+          }
+          const url = String(res?.url ?? '').trim();
+          return `已创建文档「${name}」(ID: ${nodeId})${url ? `\n链接: ${url}` : ''}`;
         },
       };
     },
@@ -699,11 +705,51 @@ export const TOOL_DEFS: ToolDef[] = [
       const arr = (findArray(res) ?? []) as Array<Record<string, unknown>>;
       if (arr.length === 0) return { kind: 'result', text: '没有可用的日报模板。' };
       const lines = arr.map((t) => {
-        const id = String(pick(t, ['templateId', 'template_id', 'id']) ?? '');
-        const name = String(pick(t, ['name', 'templateName', 'template_name', 'title']) ?? '未命名模板');
+        const id = String(pick(t, ['report_template_id', 'templateId', 'template_id', 'id']) ?? '');
+        const name = String(pick(t, ['report_template_name', 'name', 'templateName', 'template_name', 'title']) ?? '未命名模板');
         return `- [${id}] ${name}`;
       });
       return { kind: 'result', text: `共 ${arr.length} 个日报模板:\n${lines.join('\n')}` };
+    },
+  },
+
+  {
+    name: 'get_report_template',
+    description: '按模板名称读取日报模板的字段定义（submit_report 前应先查，拿到要填的字段名与 templateId）。name 传模板名，如「日报」',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: '模板名称（必填，来自 list_report_templates），如 日报/周报/月报' },
+      },
+      required: ['name'],
+      additionalProperties: false,
+    },
+    confirm: 'none',
+    async run(args, ctx) {
+      const name = String(args.name ?? '').trim();
+      if (!name) return { kind: 'error', text: 'name 不能为空（传模板名，如「日报」）。' };
+      let res: unknown;
+      try {
+        res = await dwsJson(ctx.dwsBin, ['report', 'template', 'get', '--name', name]);
+      } catch (e) {
+        return { kind: 'error', text: `读取模板失败: ${String(e)}` };
+      }
+      const result = (res as Record<string, unknown>)?.result as Record<string, unknown> | undefined;
+      const root = result ?? (res as Record<string, unknown>);
+      const templateId = String(pick(root, ['report_template_id', 'templateId', 'id']) ?? '');
+      const templateName = String(pick(root, ['report_template_name', 'name', 'title']) ?? name);
+      const fields = (root.report_template_fields ?? root.fields ?? []) as Array<Record<string, unknown>>;
+      if (!Array.isArray(fields) || fields.length === 0) {
+        return { kind: 'result', text: `模板「${templateName}」(ID: ${templateId}) 没有字段定义。` };
+      }
+      const lines = fields
+        .slice()
+        .sort((a, b) => Number(a.field_sort ?? 0) - Number(b.field_sort ?? 0))
+        .map((f) => `- ${String(f.field_name ?? f.name ?? '?')}`);
+      return {
+        kind: 'result',
+        text: `模板「${templateName}」templateId=${templateId}\n需填字段:\n${lines.join('\n')}\n（submit_report 的 fields 用这些字段名作为键）`,
+      };
     },
   },
 

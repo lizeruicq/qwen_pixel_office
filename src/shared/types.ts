@@ -83,7 +83,9 @@ export type ServerMessage =
   | { type: 'ui_dialog'; portrait?: string; portraitKey?: string; text: string } // 调试：游戏内弹 RPG 对话（portrait=图片路径 / portraitKey=角色胸像）
   | { type: 'ui_toggle'; target: 'qz' | 'workers' | 'boss' | 'phone' | 'player'; show: boolean } // 调试：显隐角色/手机
   | { type: 'ui_phone_msg'; from: 'boss' | 'xiaomei'; text: string } // 调试：往手机推一条消息
-  | { type: 'ui_bubble'; target: 'boss' | 'worker0' | 'worker1' | 'qz' | 'player'; text: string }; // 调试：指定角色头顶气泡
+  | { type: 'ui_bubble'; target: 'boss' | 'worker0' | 'worker1' | 'qz' | 'player'; text: string } // 调试：指定角色头顶气泡
+  | { type: 'ui_visibility'; vis: Record<string, boolean> } // 连接建立时下发当前各角色显隐状态（用于刷新后恢复）
+  | { type: 'sim_event'; event: string; text?: string; sender?: string; ts: number }; // 调试：模拟时间流事件（千仔回复/at我/群消息/新待办等）
 
 /** client→server 请求消息 */
 export type ClientMessage =
@@ -96,8 +98,9 @@ export type ClientMessage =
   | { type: 'adjust_stat'; stat: 'energy' | 'mood' | 'focus' | 'coins'; delta: number }
   | {
       type: 'debug_ui';
-      kind: 'panel' | 'dialog' | 'toggle' | 'phone_msg' | 'bubble';
+      kind: 'panel' | 'dialog' | 'toggle' | 'phone_msg' | 'bubble' | 'sim_event';
       image?: string; portrait?: string; portraitKey?: string; text?: string;
       target?: 'qz' | 'workers' | 'boss' | 'phone' | 'worker0' | 'worker1' | 'player'; show?: boolean;
       from?: 'boss' | 'xiaomei';
+      event?: string; sender?: string;
     };

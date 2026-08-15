@@ -79,7 +79,6 @@
     #clock-row { border-left: 2px solid #0b0d10; padding-left: 14px; font-size: 14px; letter-spacing: 1px; }
     #v-clock { color: #eac54f; font-weight: bold; margin: 0 4px; }
     #v-phase { padding: 0 5px; font-size: 11px; background: #241d30; }
-    #v-clock-mode { font-size: 10px; margin-left: 4px; }
     .phase-清晨 { color: #8ddb8c; } .phase-上午 { color: #6cb6ff; } .phase-下午 { color: #eac54f; }
     .phase-傍晚 { color: #dc8850; } .phase-深夜 { color: #b39ddb; }
 
@@ -174,7 +173,7 @@
       background-position: 0 0; background-repeat: no-repeat;
     }
     .avatar.me { --av: url('/assets/player.png'); }
-    .avatar.qz { --av: url('/assets/qianzai.png'); background-size: 72px 96px; }
+    .avatar.qz { --av: url('/assets/portrait_char_qz.png'); background-size: contain; }
     .bubble {
       max-width: 78%; padding: 6px 8px; line-height: 1.5; word-break: break-word;
       border: 2px solid #0b0d10; box-shadow: inset -2px -2px 0 rgba(0,0,0,.3);
@@ -202,7 +201,7 @@
       <div id="hud-portrait"></div>
       <div id="hud-tier"><span id="v-tier">开心</span><span id="v-off" class="dim"></span></div>
     </div>
-    <div id="clock-row"><span id="v-phase">--</span> <span id="v-clock">--:--</span><span id="v-clock-mode" class="dim"></span></div>
+    <div id="clock-row"><span id="v-phase">--</span> <span id="v-clock">--:--</span></div>
   </div>
   <div id="drawer" class="closed">
     <div class="screen">
