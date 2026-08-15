@@ -199,8 +199,8 @@ export const WORKERS = [
   { id: 'worker1', name: '小橙', seatId: 'desk_br', sprite: 'agent_typing0', typing: 'agent_typing0', portrait: '/assets/portrait_char_xiaocheng.png' }, // 橙/红衣
 ];
 
-/** 老板：站在大屏幕旁，不移动，idle 面朝镜头。sprite=npcwalk（唯一有正面帧的表） */
-export const BOSS = { name: '老板', sprite: 'npcwalk', x: 126, y: 92, portrait: '/assets/portrait_char_boss.png' };
+/** 老板：站在大屏幕旁，不移动，idle 面朝镜头。sprite=boss（老年商人 idle 四方向表，frame0=正面） */
+export const BOSS = { name: '老板', sprite: 'boss', x: 126, y: 92, portrait: '/assets/portrait_char_boss.png' };
 
 /** 玩家对话头像：按心情档位映射到现有 portrait_*.png */
 export const PLAYER_PORTRAITS = {
