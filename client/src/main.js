@@ -445,10 +445,11 @@ class OfficeScene extends Phaser.Scene {
     $('v-energy').textContent = `${Math.round(s.energy)}/${s.energyCap}`;
     $('v-mood').textContent = Math.round(s.mood);
     $('v-focus').textContent = Math.round(s.focus);
-    $('v-coins').textContent = s.coins;
-    $('v-level').textContent = s.level;
     $('v-tier').textContent = s.moodTier;
     $('v-off').textContent = this.wsOk ? '' : ' ｜ 离线';
+    // 头像按当前心情档位切换（portrait 图 + 文字）
+    const port = $('hud-portrait');
+    if (port) port.style.backgroundImage = `url('${this.playerPortrait()}')`;
   }
 
   /* 千仔气泡：千仔隐藏时不弹 */
