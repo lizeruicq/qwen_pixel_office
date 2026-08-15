@@ -121,6 +121,7 @@
 
     <h2 style="margin-top:16px">角色 / 界面开关</h2>
     <div class="toggles">
+      <label><input type="checkbox" id="tg-player" checked> 玩家（自己）</label>
       <label><input type="checkbox" id="tg-qz" checked> 千仔</label>
       <label><input type="checkbox" id="tg-workers" checked> 两名同事</label>
       <label><input type="checkbox" id="tg-boss" checked> 老板</label>
@@ -261,7 +262,7 @@ $('btn-dialog').onclick = () => {
   send({ type: 'debug_ui', kind: 'dialog', portrait: $('dlg-portrait').value, text });
 };
 // 角色/界面显隐开关
-for (const target of ['qz', 'workers', 'boss', 'phone']) {
+for (const target of ['player', 'qz', 'workers', 'boss', 'phone']) {
   $('tg-' + target).onchange = (e) => send({ type: 'debug_ui', kind: 'toggle', target, show: e.target.checked });
 }
 // 手机消息推送

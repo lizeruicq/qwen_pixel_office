@@ -173,6 +173,7 @@ class OfficeScene extends Phaser.Scene {
     this.setVisible('qz', true);
     this.setVisible('workers', true);
     this.setVisible('boss', true);
+    this.setVisible('player', true);
     this.setVisible('phone', false); // 手机默认收起
 
     // ---------- 暴露给调试/控制台：胸像注册表（PNG 路径） + 手机控制 ----------
@@ -267,21 +268,40 @@ class OfficeScene extends Phaser.Scene {
 
   /* ---------- 打卡 ---------- */
 
-  /* 角色/手机显隐（调试页 ui_toggle 驱动） */
+  /* 单个 sprite 渐隐/渐显（Phaser alpha tween，结束后再 setVisible 避免占位） */
+  fadeSprite(spr, show) {
+    if (!spr) return;
+    this.tweens.killTweensOf(spr);
+    if (show) {
+      spr.setVisible(true);
+      this.tweens.add({ targets: spr, alpha: 1, duration: 350, ease: 'Sine.easeInOut' });
+    } else {
+      this.tweens.add({
+        targets: spr, alpha: 0, duration: 350, ease: 'Sine.easeInOut',
+        onComplete: () => spr.setVisible(false),
+      });
+    }
+  }
+
+  /* 角色/手机显隐（调试页 ui_toggle 驱动），全部渐隐/渐显 */
   setVisible(target, show) {
-    this.vis = this.vis || { qz: true, workers: true, boss: true, phone: false };
+    this.vis = this.vis || { qz: true, workers: true, boss: true, phone: false, player: true };
     this.vis[target] = show;
     if (target === 'qz') {
-      this.qz?.setVisible(show);
+      this.fadeSprite(this.qz, show);
       if (!show) this.qzBubble?.hide();
       this.panels?.setQzVisible(show);
     } else if (target === 'workers') {
       for (const w of this.workers || []) {
-        w.spr.setVisible(show);
+        this.fadeSprite(w.spr, show);
         if (!show) w.bubble.hide();
       }
     } else if (target === 'boss') {
-      this.boss?.setVisible(show);
+      this.fadeSprite(this.boss, show);
+      if (!show) this.bossBubble?.hide();
+    } else if (target === 'player') {
+      this.fadeSprite(this.char, show);
+      if (!show) this.playerBubble?.hide();
     } else if (target === 'phone') {
       this.phone?.setVisible(show);
     }

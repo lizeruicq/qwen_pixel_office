@@ -81,7 +81,7 @@ export type ServerMessage =
   | { type: 'time'; mode: 'natural' | 'manual'; now: number; phase: string; ts: number }
   | { type: 'ui_panel'; image: string; text: string }   // 调试：游戏内弹确认面板
   | { type: 'ui_dialog'; portrait?: string; portraitKey?: string; text: string } // 调试：游戏内弹 RPG 对话（portrait=图片路径 / portraitKey=角色胸像）
-  | { type: 'ui_toggle'; target: 'qz' | 'workers' | 'boss' | 'phone'; show: boolean } // 调试：显隐角色/手机
+  | { type: 'ui_toggle'; target: 'qz' | 'workers' | 'boss' | 'phone' | 'player'; show: boolean } // 调试：显隐角色/手机
   | { type: 'ui_phone_msg'; from: 'boss' | 'xiaomei'; text: string } // 调试：往手机推一条消息
   | { type: 'ui_bubble'; target: 'boss' | 'worker0' | 'worker1' | 'qz' | 'player'; text: string }; // 调试：指定角色头顶气泡
 
