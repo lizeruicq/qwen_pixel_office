@@ -575,8 +575,6 @@ class OfficeScene extends Phaser.Scene {
       phaseEl.textContent = c.phase;
       phaseEl.className = `phase-${c.phase}`;
     }
-    const modeEl = $('v-clock-mode');
-    if (modeEl) modeEl.textContent = c.mode === 'manual' ? '⏱人工' : '';
   }
 
   /* 对比上一帧 state，属性变化时在 HUD 对应行飘出数字（增=红，减=灰） */
