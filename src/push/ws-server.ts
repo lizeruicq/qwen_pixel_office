@@ -97,6 +97,16 @@ export class PushServer {
     this.broadcast({ type: 'todos', items: this.deps.poller.list() });
   }
 
+  /** 前端「刷新待办」：先真正向 dws 拉一次最新快照，再广播（否则只回内存缓存，可能滞后一个轮询周期） */
+  private async refreshTodos(): Promise<void> {
+    try {
+      await this.deps.poller.poll();
+    } catch (e) {
+      log('todo', `手动刷新轮询失败: ${String(e)}`);
+    }
+    this.broadcastTodos();
+  }
+
   private timeMsg(): { type: 'time'; mode: 'natural' | 'manual'; now: number; phase: string; ts: number } {
     const s = this.deps.clock.snapshot();
     return { type: 'time', mode: s.mode, now: s.now, phase: s.phase, ts: Date.now() };
@@ -164,7 +174,7 @@ export class PushServer {
           const items = await this.deps.fetchMessages(String(m.convId ?? ''));
           this.send(ws, { type: 'messages', convId: m.convId, items });
         } else if (m.name === 'todos') {
-          this.broadcastTodos();
+          await this.refreshTodos();
         }
         return;
       }
@@ -189,6 +199,15 @@ export class PushServer {
         if (allowed.includes(m.stat) && typeof m.delta === 'number') {
           game.adjustStat(m.stat, m.delta); // changed() → onStateChange → broadcastState()
           log('debug', `调整属性 ${m.stat} ${m.delta > 0 ? '+' : ''}${m.delta}`);
+        }
+        return;
+      }
+      if (msg.type === 'set_stat') {
+        const m = msg as { type: 'set_stat'; stat: 'energy' | 'mood' | 'focus' | 'coins'; value: number };
+        const allowed = ['energy', 'mood', 'focus', 'coins'];
+        if (allowed.includes(m.stat) && typeof m.value === 'number' && Number.isFinite(m.value)) {
+          game.setStat(m.stat, m.value); // changed() → onStateChange → broadcastState()
+          log('debug', `设定属性 ${m.stat} = ${m.value}`);
         }
         return;
       }

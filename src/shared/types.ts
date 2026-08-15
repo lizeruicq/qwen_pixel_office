@@ -96,6 +96,7 @@ export type ClientMessage =
   | { type: 'agent_cancel' }
   | { type: 'set_time'; mode: 'natural' | 'manual'; ms?: number }
   | { type: 'adjust_stat'; stat: 'energy' | 'mood' | 'focus' | 'coins'; delta: number }
+  | { type: 'set_stat'; stat: 'energy' | 'mood' | 'focus' | 'coins'; value: number }
   | {
       type: 'debug_ui';
       kind: 'panel' | 'dialog' | 'toggle' | 'phone_msg' | 'bubble' | 'sim_event';

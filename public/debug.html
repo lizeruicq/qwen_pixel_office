@@ -95,6 +95,16 @@
       <button class="primary" id="adj-add">＋加</button>
       <button class="danger" id="adj-sub">－减</button>
     </div>
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">
+      <select id="set-stat" style="flex:1;background:#14161a;border:1px solid #3d4451;color:#d8dee6;border-radius:6px;padding:6px 8px;font-family:inherit;font-size:12px">
+        <option value="energy">能量</option>
+        <option value="mood">心情</option>
+        <option value="focus">专注</option>
+        <option value="coins">金币</option>
+      </select>
+      <input id="set-value" type="number" style="width:80px" placeholder="目标值">
+      <button class="primary" id="set-btn">＝设为</button>
+    </div>
 
     <h2>面板弹出（游戏内）</h2>
     <select id="panel-img">
@@ -138,21 +148,22 @@
     </select>
     <input id="pm-text" placeholder="消息内容">
     <button class="primary" id="btn-phone-msg">发一条消息</button>
-
-    <h2 style="margin-top:16px">头顶气泡（游戏内）</h2>
-    <select id="bb-target">
-      <option value="player">玩家</option>
-      <option value="boss">老板</option>
-      <option value="worker0">小蓝（同事）</option>
-      <option value="worker1">小橙（同事）</option>
-      <option value="qz">千仔</option>
-    </select>
-    <input id="bb-text" placeholder="气泡内容">
-    <button class="primary" id="btn-bubble">冒一个气泡</button>
   </section>
 
   <section>
     <h2>事件流</h2>
+    <div class="sim-box">
+      <div class="sim-title">头顶气泡（游戏内）</div>
+      <select id="bb-target">
+        <option value="player">玩家</option>
+        <option value="boss">老板</option>
+        <option value="worker0">小蓝（同事）</option>
+        <option value="worker1">小橙（同事）</option>
+        <option value="qz">千仔</option>
+      </select>
+      <input id="bb-text" placeholder="气泡内容">
+      <button class="primary" id="btn-bubble">冒一个气泡</button>
+    </div>
     <div class="sim-box">
       <div class="sim-title">模拟时间流（触发一条事件）</div>
       <select id="sim-event">
@@ -273,6 +284,12 @@ function adjust(sign) {
 }
 $('adj-add').onclick = () => adjust(1);
 $('adj-sub').onclick = () => adjust(-1);
+$('set-btn').onclick = () => {
+  const stat = $('set-stat').value;
+  const v = Number($('set-value').value);
+  if (!Number.isFinite(v)) return;
+  send({ type: 'set_stat', stat, value: v });
+};
 $('btn-panel').onclick = () => {
   const text = $('panel-text').value.trim();
   if (!text) return;

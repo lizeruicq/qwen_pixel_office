@@ -442,6 +442,26 @@ export class GameState {
     this.changed();
   }
 
+  /** 直接把属性设为指定值（调试页用），按各自上下限夹取 */
+  setStat(stat: 'energy' | 'mood' | 'focus' | 'coins', value: number): void {
+    if (!Number.isFinite(value)) return;
+    switch (stat) {
+      case 'energy':
+        this.p.energy = Math.max(0, Math.min(this.energyCap(), value));
+        break;
+      case 'mood':
+        this.p.mood = this.clampMood(value);
+        break;
+      case 'focus':
+        this.p.focus = Math.max(0, Math.min(100, value));
+        break;
+      case 'coins':
+        this.p.coins = Math.max(0, Math.round(value));
+        break;
+    }
+    this.changed();
+  }
+
   snapshot(): StateSnapshot {
     return {
       energy: round1(this.p.energy),
