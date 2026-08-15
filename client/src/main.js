@@ -550,7 +550,7 @@ class OfficeScene extends Phaser.Scene {
         this.showBubble(msg.target, msg.text || '');
         break;
       case 'time':
-        this.clockInfo = { now: msg.now, phase: msg.phase, mode: msg.mode, at: performance.now() };
+        this.clockInfo = { now: msg.now, phase: msg.phase, mode: msg.mode, paused: !!msg.paused, at: performance.now() };
         this.renderClock();
         // 时段变化 → 切换窗外景（清晨/上午/傍晚/深夜，下午并入白天）
         {
@@ -565,7 +565,7 @@ class OfficeScene extends Phaser.Scene {
   renderClock() {
     const c = this.clockInfo;
     if (!c) return;
-    const cur = c.now + (performance.now() - c.at);
+    const cur = c.paused ? c.now : c.now + (performance.now() - c.at); // 暂停时冻结，不插值
     const d = new Date(cur);
     const p = (n) => String(n).padStart(2, '0');
     const clockEl = $('v-clock');

@@ -65,6 +65,7 @@ export class PushServer {
       this.send(ws, { type: 'state', state: this.deps.game.snapshot() });
       this.send(ws, { type: 'todos', items: this.deps.poller.list() });
       this.send(ws, { type: 'ui_visibility', vis: this.visibility }); // 下发当前显隐状态，刷新后恢复
+      this.send(ws, { type: 'natural_paused', paused: this.deps.game.isNaturalPaused() }); // 下发自然变动暂停状态
       this.sendTime(ws);
       ws.on('message', (data) => {
         void this.handleMessage(ws, data.toString());
@@ -107,9 +108,9 @@ export class PushServer {
     this.broadcastTodos();
   }
 
-  private timeMsg(): { type: 'time'; mode: 'natural' | 'manual'; now: number; phase: string; ts: number } {
+  private timeMsg(): { type: 'time'; mode: 'natural' | 'manual'; now: number; phase: string; paused: boolean; ts: number } {
     const s = this.deps.clock.snapshot();
-    return { type: 'time', mode: s.mode, now: s.now, phase: s.phase, ts: Date.now() };
+    return { type: 'time', mode: s.mode, now: s.now, phase: s.phase, paused: s.paused, ts: Date.now() };
   }
 
   private sendTime(ws: WebSocket): void {
@@ -166,6 +167,13 @@ export class PushServer {
         this.broadcastTime();
         return;
       }
+      if (msg.type === 'set_time_paused') {
+        const m = msg as { type: 'set_time_paused'; paused: boolean };
+        this.deps.clock.setPaused(Boolean(m.paused));
+        log('clock', `时间流逝 ${m.paused ? '已暂停' : '已恢复'}`);
+        this.broadcastTime();
+        return;
+      }
       if (msg.type === 'panel') {
         const m = msg as { type: 'panel'; name?: string; convId?: string };
         if (m.name === 'conversations') {
@@ -209,6 +217,13 @@ export class PushServer {
           game.setStat(m.stat, m.value); // changed() → onStateChange → broadcastState()
           log('debug', `设定属性 ${m.stat} = ${m.value}`);
         }
+        return;
+      }
+      if (msg.type === 'set_natural_paused') {
+        const m = msg as { type: 'set_natural_paused'; paused: boolean };
+        const paused = game.setNaturalPaused(Boolean(m.paused));
+        this.broadcast({ type: 'natural_paused', paused });
+        log('debug', `属性自然变动 ${paused ? '已暂停' : '已恢复'}`);
         return;
       }
       if (msg.type === 'debug_ui') {

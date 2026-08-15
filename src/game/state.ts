@@ -108,6 +108,8 @@ export class GameState {
   private lastAtByConv = new Map<string, number>();
   private atPressureCooldown = new Map<string, number>();
   private lateNightTimes: number[] = [];
+  /** 暂停属性自然变动（tick 不再改能量/心情/专注）；手动调整不受影响 */
+  private naturalPaused = false;
 
   onNotice?: (text: string) => void;
   onStateChange?: () => void;
@@ -381,8 +383,19 @@ export class GameState {
 
   /* ---------- 每分钟结算 ---------- */
 
+  /** 暂停/恢复属性自然变动；返回当前状态 */
+  setNaturalPaused(paused: boolean): boolean {
+    this.naturalPaused = paused;
+    return this.naturalPaused;
+  }
+
+  isNaturalPaused(): boolean {
+    return this.naturalPaused;
+  }
+
   tick(now: number, todos: TodoItem[]): void {
     this.checkDailyReset();
+    if (this.naturalPaused) return; // 暂停自然变动：能量/心情/专注不随时间变化（手动调整仍生效）
     const prevTier = this.moodTier().name;
     const rg = this.numbers.energy.regen;
 

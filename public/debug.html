@@ -74,6 +74,7 @@
       <button id="btn-natural" title="切回自然时间">自然</button>
       <input id="manual-dt" type="datetime-local" step="60">
       <button class="primary" id="btn-manual">设定</button>
+      <button id="btn-time-pause" title="暂停/恢复时间流逝">⏸暂停</button>
     </div>
     <h2 style="margin-top:16px">AI 千仔</h2>
     <input id="chat" placeholder="自然语言指令（需配置 LLM）" onkeydown="if(event.key==='Enter')chat()">
@@ -105,6 +106,9 @@
       <input id="set-value" type="number" style="width:80px" placeholder="目标值">
       <button class="primary" id="set-btn">＝设为</button>
     </div>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:#adbac7;margin-bottom:10px">
+      <input type="checkbox" id="tg-natural-pause" style="width:auto;margin:0;accent-color:#316dca"> 暂停属性自然变动（手动调整仍生效）
+    </label>
 
     <h2>面板弹出（游戏内）</h2>
     <select id="panel-img">
@@ -199,6 +203,7 @@ function route(msg) {
     case 'agent_card': addCard(msg); break;
     case 'notice': addEvent({ kind: 'notice', payload: { text: msg.text }, ts: msg.ts }); break;
     case 'time': renderClock(msg); break;
+    case 'natural_paused': { const cb = $('tg-natural-pause'); if (cb) cb.checked = !!msg.paused; break; }
     case 'ui_visibility': { // 后端下发当前显隐状态 → 同步勾选框（刷新后恢复）
       const vis = msg.vis || {};
       for (const k of Object.keys(vis)) { const cb = $('tg-' + k); if (cb) cb.checked = !!vis[k]; }
@@ -213,6 +218,8 @@ function renderClock(msg) {
   $('v-clock-now').textContent = new Date(msg.now).toLocaleString('zh-CN', { hour12: false });
   $('v-clock-phase').textContent = msg.phase;
   $('v-clock-mode').textContent = msg.mode === 'manual' ? '（人工）' : '（自然）';
+  const pb = $('btn-time-pause');
+  if (pb) pb.textContent = msg.paused ? '▶恢复' : '⏸暂停';
 }
 
 function renderState() {
@@ -276,6 +283,7 @@ function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj))
 function act(name, params) { send({ type: 'action', name, params: params || {} }); }
 function chat() { const el = $('chat'); if (!el.value.trim()) return; send({ type: 'agent_chat', text: el.value.trim() }); el.value = ''; }
 $('btn-natural').onclick = () => send({ type: 'set_time', mode: 'natural' });
+$('btn-time-pause').onclick = () => send({ type: 'set_time_paused', paused: !(lastClock && lastClock.paused) });
 function adjust(sign) {
   const stat = $('adj-stat').value;
   const v = Number($('adj-delta').value);
@@ -290,6 +298,7 @@ $('set-btn').onclick = () => {
   if (!Number.isFinite(v)) return;
   send({ type: 'set_stat', stat, value: v });
 };
+$('tg-natural-pause').onchange = (e) => send({ type: 'set_natural_paused', paused: e.target.checked });
 $('btn-panel').onclick = () => {
   const text = $('panel-text').value.trim();
   if (!text) return;

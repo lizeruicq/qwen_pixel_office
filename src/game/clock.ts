@@ -20,6 +20,8 @@ export interface ClockSnapshot {
   now: number;
   /** 五阶段：清晨/上午/下午/傍晚/深夜 */
   phase: string;
+  /** 时间流逝是否已暂停 */
+  paused: boolean;
 }
 
 /** 按小时划分五阶段 */
@@ -38,6 +40,10 @@ export class Clock {
   private manualBase = Date.now();
   /** manual 模式下：设定基准时对应的真实时刻 */
   private manualRealBase = Date.now();
+  /** 是否暂停流逝 */
+  private paused = false;
+  /** 暂停那一刻冻结的时钟时间 */
+  private pausedAt = 0;
 
   constructor(private store: Store) {
     this.load();
@@ -47,10 +53,12 @@ export class Clock {
     const raw = this.store.kvGet(KV_KEY);
     if (!raw) return;
     try {
-      const d = JSON.parse(raw) as { mode?: ClockMode; manualBase?: number; manualRealBase?: number };
+      const d = JSON.parse(raw) as { mode?: ClockMode; manualBase?: number; manualRealBase?: number; paused?: boolean; pausedAt?: number };
       if (d.mode === 'manual' || d.mode === 'natural') this.mode = d.mode;
       if (typeof d.manualBase === 'number') this.manualBase = d.manualBase;
       if (typeof d.manualRealBase === 'number') this.manualRealBase = d.manualRealBase;
+      if (typeof d.paused === 'boolean') this.paused = d.paused;
+      if (typeof d.pausedAt === 'number') this.pausedAt = d.pausedAt;
     } catch {
       /* 损坏则用默认 */
     }
@@ -59,12 +67,13 @@ export class Clock {
   private persist(): void {
     this.store.kvSet(
       KV_KEY,
-      JSON.stringify({ mode: this.mode, manualBase: this.manualBase, manualRealBase: this.manualRealBase }),
+      JSON.stringify({ mode: this.mode, manualBase: this.manualBase, manualRealBase: this.manualRealBase, paused: this.paused, pausedAt: this.pausedAt }),
     );
   }
 
-  /** 当前时钟时间（毫秒）。所有游戏逻辑都应以此为准。 */
+  /** 当前时钟时间（毫秒）。所有游戏逻辑都应以此为准。暂停时冻结在暂停那一刻。 */
   now(): number {
+    if (this.paused) return this.pausedAt;
     if (this.mode === 'manual') {
       return this.manualBase + (Date.now() - this.manualRealBase);
     }
@@ -73,7 +82,34 @@ export class Clock {
 
   snapshot(): ClockSnapshot {
     const now = this.now();
-    return { mode: this.mode, now, phase: phaseOf(now) };
+    return { mode: this.mode, now, phase: phaseOf(now), paused: this.paused };
+  }
+
+  /** 暂停/恢复时间流逝。恢复时重新锚定基准，时间从暂停点继续走（不跳变）。 */
+  setPaused(paused: boolean): ClockSnapshot {
+    if (paused === this.paused) return this.snapshot();
+    if (paused) {
+      this.pausedAt = this.now();
+      this.paused = true;
+    } else {
+      // 以冻结点为新的基准重新锚定
+      if (this.mode === 'manual') {
+        this.manualBase = this.pausedAt;
+        this.manualRealBase = Date.now();
+      } else {
+        // 自然模式恢复后直接跟随真实时间
+        this.paused = false;
+        this.persist();
+        return this.snapshot();
+      }
+      this.paused = false;
+    }
+    this.persist();
+    return this.snapshot();
+  }
+
+  isPaused(): boolean {
+    return this.paused;
   }
 
   /** 切回自然时间 */
