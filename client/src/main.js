@@ -193,10 +193,8 @@ class OfficeScene extends Phaser.Scene {
 
     // 闲聊对话库（玩家先、同事答，两轮）
     this.CHAT_SCRIPTS = [
-      [['在忙吗？', '嗯，需求堆成山了。'], ['需要帮忙吗？', '不用不用，我扛得住…大概。']],
-      [['吃饭了吗？', '随便对付了一口，哪有时间。'], ['别太累了', '没办法，deadline 不等人啊。']],
-      [['最近怎么样？', '老样子，白天开会晚上写码。'], ['注意身体', '等项目上线就好好休息…大概吧。']],
-      [['周末去哪玩了？', '周末？我在家补觉。'], ['太惨了吧', '习惯就好，打工人不配拥有周末。']],
+      [['听说隔壁项目的事了？', '听说了，除了每天和王总走一起的欣欣，其他人都被"广进"了。'], ['欣欣？她不是刚来不久吗...', '别说了，老板说了不能打听。']],
+      [['名单会有我们吗？', '不知道。快到还房贷的时间了，还要给女儿交学费呢。'], ['要是被裁了能找到工作吗', '我三十多了，应该不太好找...']],
     ];
 
     // 点击地板走过去
@@ -396,7 +394,7 @@ class OfficeScene extends Phaser.Scene {
     for (const [mine, theirs] of script) {
       await rpgDialog({ portrait: this.playerPortrait(), text: `${mine}` });
       await pause(240);
-      await rpgDialog({ portrait: w.portrait, text: `${name}：${theirs}` });
+      await rpgDialog({ portrait: w.portrait, text: `${theirs}` });
       await pause(240);
     }
   }
