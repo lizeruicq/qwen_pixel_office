@@ -42,6 +42,8 @@ export class PushServer {
   private chatHistories = new Map<WebSocket, ChatMessage[]>();
   /** 各角色/界面显隐状态（跨刷新保持，后端内存中），新连接建立时下发 */
   private visibility: Record<string, boolean> = { qz: true, workers: true, boss: true, player: true, phone: false };
+  /** 自由行动开关（关闭后对应角色可长按拖拽）；新连接建立时下发 */
+  private roam = { player: true, qz: true };
   private server: http.Server;
 
   constructor(
@@ -65,6 +67,7 @@ export class PushServer {
       this.send(ws, { type: 'state', state: this.deps.game.snapshot() });
       this.send(ws, { type: 'todos', items: this.deps.poller.list() });
       this.send(ws, { type: 'ui_visibility', vis: this.visibility }); // 下发当前显隐状态，刷新后恢复
+      this.send(ws, { type: 'ui_roam', roam: this.roam }); // 下发自由行动开关状态
       this.send(ws, { type: 'natural_paused', paused: this.deps.game.isNaturalPaused() }); // 下发自然变动暂停状态
       this.sendTime(ws);
       ws.on('message', (data) => {
@@ -230,10 +233,10 @@ export class PushServer {
       if (msg.type === 'debug_ui') {
         // 调试页控制游戏窗口：弹面板/对话、显隐角色、推手机消息 —— 广播给所有客户端渲染
         const m = msg as {
-          type: 'debug_ui'; kind: 'panel' | 'dialog' | 'toggle' | 'phone_msg' | 'bubble' | 'sim_event';
+          type: 'debug_ui'; kind: 'panel' | 'dialog' | 'toggle' | 'phone_msg' | 'bubble' | 'sim_event' | 'roam';
           image?: string; portrait?: string; portraitKey?: string; text?: string;
           target?: 'qz' | 'workers' | 'boss' | 'phone' | 'worker0' | 'worker1' | 'player'; show?: boolean; from?: 'boss' | 'xiaomei';
-          event?: string; sender?: string;
+          event?: string; sender?: string; roam?: { player?: boolean; qz?: boolean };
         };
         if (m.kind === 'panel') {
           this.broadcast({ type: 'ui_panel', image: String(m.image ?? ''), text: String(m.text ?? '') });
@@ -255,6 +258,12 @@ export class PushServer {
           // 模拟时间流：调试页触发一个事件，广播给游戏端按真实事件同样处理
           this.broadcast({ type: 'sim_event', event: String(m.event), text: String(m.text ?? ''), sender: String(m.sender ?? ''), ts: Date.now() });
           log('debug', `模拟事件 ${m.event}：${String(m.text ?? '').slice(0, 24)}`);
+        } else if (m.kind === 'roam' && m.roam) {
+          // 自由行动开关：记住并广播；关闭后对应角色在游戏里可长按拖拽
+          if (typeof m.roam.player === 'boolean') this.roam.player = m.roam.player;
+          if (typeof m.roam.qz === 'boolean') this.roam.qz = m.roam.qz;
+          this.broadcast({ type: 'ui_roam', roam: this.roam });
+          log('debug', `自由行动 玩家=${this.roam.player ? '开' : '关'} 千仔=${this.roam.qz ? '开' : '关'}`);
         }
         return;
       }

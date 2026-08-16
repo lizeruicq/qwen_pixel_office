@@ -149,6 +149,12 @@
       <label><input type="checkbox" id="tg-phone"> 手机界面</label>
     </div>
 
+    <h2 style="margin-top:16px">自由行动（关闭后可长按拖拽）</h2>
+    <div class="toggles">
+      <label><input type="checkbox" id="roam-player" checked> 主角自由行动</label>
+      <label><input type="checkbox" id="roam-qz" checked> 千仔自由行动</label>
+    </div>
+
     <h2 style="margin-top:16px">手机消息推送</h2>
     <select id="pm-from">
       <option value="boss">老板</option>
@@ -208,6 +214,12 @@ function route(msg) {
     case 'notice': addEvent({ kind: 'notice', payload: { text: msg.text }, ts: msg.ts }); break;
     case 'time': renderClock(msg); break;
     case 'natural_paused': { const cb = $('tg-natural-pause'); if (cb) cb.checked = !!msg.paused; break; }
+    case 'ui_roam': { // 自由行动开关状态 → 同步勾选框（刷新后恢复）
+      const r = msg.roam || {};
+      if ($('roam-player') && typeof r.player === 'boolean') $('roam-player').checked = r.player;
+      if ($('roam-qz') && typeof r.qz === 'boolean') $('roam-qz').checked = r.qz;
+      break;
+    }
     case 'ui_visibility': { // 后端下发当前显隐状态 → 同步勾选框（刷新后恢复）
       const vis = msg.vis || {};
       for (const k of Object.keys(vis)) { const cb = $('tg-' + k); if (cb) cb.checked = !!vis[k]; }
@@ -303,6 +315,12 @@ $('set-btn').onclick = () => {
   send({ type: 'set_stat', stat, value: v });
 };
 $('tg-natural-pause').onchange = (e) => send({ type: 'set_natural_paused', paused: e.target.checked });
+// 自由行动开关
+function sendRoam() {
+  send({ type: 'debug_ui', kind: 'roam', roam: { player: $('roam-player').checked, qz: $('roam-qz').checked } });
+}
+$('roam-player').onchange = sendRoam;
+$('roam-qz').onchange = sendRoam;
 $('btn-panel').onclick = () => {
   const text = $('panel-text').value.trim();
   if (!text) return;

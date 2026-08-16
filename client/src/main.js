@@ -169,6 +169,11 @@ class OfficeScene extends Phaser.Scene {
     // ---------- 手机界面（右下角，调试页控制开关/推消息） ----------
     this.phone = createPhone();
 
+    // ---------- 自由行动开关（调试页 ui_roam）。关闭后角色原地站立，可长按拖拽 ----------
+    this.roam = { player: true, qz: true };
+    this._drag = null; // { who:'player'|'qz', spr, dx, dy }
+    this.setupDrag();
+
     // ---------- 角色/手机显隐（调试页 ui_toggle） ----------
     this.setVisible('qz', true);
     this.setVisible('workers', true);
@@ -201,6 +206,15 @@ class OfficeScene extends Phaser.Scene {
     // 点击地板走过去
     this.input.on('pointerdown', (p) => {
       const wp = this.cameras.main.getWorldPoint(p.x, p.y);
+      // 自由行动关闭时：长按角色 → 拖拽（优先于其它点击交互）
+      const dragWho = this.hitDraggable(wp);
+      if (dragWho) {
+        const spr = dragWho === 'player' ? this.char : this.qz;
+        this._drag = { who: dragWho, spr, dx: spr.x - wp.x, dy: spr.y - wp.y };
+        if (dragWho === 'player') { this.mainTarget = null; this.char.setVelocity(0, 0); this.standUp(); }
+        else this.qzTarget = null;
+        return;
+      }
       for (const t of PANEL_TRIGGERS) {
         if (wp.x >= t.x - t.w / 2 && wp.x <= t.x + t.w / 2 && wp.y >= t.y - t.h && wp.y <= t.y) {
           // 千仔隐藏时，秘书白板不展示千仔页，回落到待办页
@@ -239,7 +253,8 @@ class OfficeScene extends Phaser.Scene {
           return;
         }
       }
-      // 点击空白处 → 起身走向目标
+      // 点击空白处 → 起身走向目标（自由行动开启时才走）
+      if (!this.roam.player) return;
       this.standUp();
       this.mainTarget = {
         x: Phaser.Math.Clamp(wp.x, WALK_BOUNDS.minX, WALK_BOUNDS.maxX),
@@ -283,6 +298,37 @@ class OfficeScene extends Phaser.Scene {
         onComplete: () => spr.setVisible(false),
       });
     }
+  }
+
+  /* ---------- 自由行动开关 + 长按拖拽（调试页 ui_roam 驱动） ---------- */
+
+  /* 关闭自由行动时，检测点击是否落在可拖拽角色上；返回 'player' | 'qz' | null */
+  hitDraggable(wp) {
+    if (!this.roam.player && this.char?.visible && Math.abs(wp.x - this.char.x) <= 12 && wp.y <= this.char.y + 2 && wp.y >= this.char.y - 22) return 'player';
+    if (!this.roam.qz && this.qz?.visible && Math.abs(wp.x - this.qz.x) <= 10 && wp.y <= this.qz.y + 2 && wp.y >= this.qz.y - 18) return 'qz';
+    return null;
+  }
+
+  setupDrag() {
+    this.input.on('pointermove', (p) => {
+      if (!this._drag) return;
+      const wp = this.cameras.main.getWorldPoint(p.x, p.y);
+      const d = this._drag;
+      d.spr.x = Phaser.Math.Clamp(wp.x + d.dx, WALK_BOUNDS.minX, WALK_BOUNDS.maxX);
+      d.spr.y = Phaser.Math.Clamp(wp.y + d.dy, WALK_BOUNDS.minY, WALK_BOUNDS.maxY);
+      d.spr.setDepth(Math.round(d.spr.y));
+    });
+    const end = () => { this._drag = null; };
+    this.input.on('pointerup', end);
+    this.input.on('pointerupoutside', end);
+  }
+
+  /* 调试页 ui_roam：更新自由行动开关。关闭时立即停下当前移动/闲逛 */
+  setRoam(roam) {
+    if (typeof roam.player === 'boolean') this.roam.player = roam.player;
+    if (typeof roam.qz === 'boolean') this.roam.qz = roam.qz;
+    if (!this.roam.player) { this.mainTarget = null; this.char?.setVelocity(0, 0); }
+    if (!this.roam.qz) this.qzTarget = null;
   }
 
   /* 角色/手机显隐（调试页 ui_toggle 驱动），全部渐隐/渐显 */
@@ -534,6 +580,9 @@ class OfficeScene extends Phaser.Scene {
         for (const k of Object.keys(vis)) this.setVisible(k, vis[k]);
         break;
       }
+      case 'ui_roam': // 自由行动开关（连接建立时下发 + 切换时广播）
+        this.setRoam(msg.roam || {});
+        break;
       case 'sim_event': { // 调试页模拟时间流事件：按真实事件同样驱动千仔气泡
         const sender = msg.sender || '有人';
         const text = msg.text || '';
@@ -600,12 +649,21 @@ class OfficeScene extends Phaser.Scene {
   /* ---------- 循环 ---------- */
 
   update(_time, delta) {
+    const draggingPlayer = this._drag?.who === 'player';
     // 落座中：持续打字，不移动，气泡跟随
     if (this.seat) {
       this.char.setVelocity(0, 0);
       this.char.setDepth(Math.round(this.char.y));
+    } else if (!this.roam.player || draggingPlayer) {
+      // 自由行动关闭 / 拖拽中：原地站立（拖拽由 pointermove 直接改坐标）
+      if (!draggingPlayer) {
+        this.char.setVelocity(0, 0);
+        this.char.anims.stop();
+        this.char.setFrame(IDLE_FRAME[this.char.getData('dir') || 'down']);
+      }
+      this.char.setDepth(Math.round(this.char.y));
     } else {
-      // 闲逛
+      // 闲逛（仅在自由行动开启时）
       if (!this.mainTarget && this.time.now >= this.nextWanderAt) {
         const spot = HOTSPOTS[Phaser.Math.Between(0, HOTSPOTS.length - 1)];
         this.mainTarget = {
@@ -650,8 +708,8 @@ class OfficeScene extends Phaser.Scene {
       this.renderClock();
     }
 
-    // ---------- 千仔：自主慢速漫步（玩家不可控制，隐藏时停走） ----------
-    const qzOn = this.qz.visible;
+    // ---------- 千仔：自主慢速漫步（玩家不可控制，隐藏或自由行动关闭时停走） ----------
+    const qzOn = this.qz.visible && this.roam.qz && this._drag?.who !== 'qz';
     if (qzOn && !this.qzTarget && this.time.now >= this.qzNextWanderAt) {
       const r = QZ_REGIONS[Phaser.Math.Between(0, QZ_REGIONS.length - 1)];
       this.qzTarget = {
@@ -677,13 +735,13 @@ class OfficeScene extends Phaser.Scene {
         this.qz.anims.play('qz-walk-' + nd, true);
       }
     }
-    if (qzOn) this.qz.setDepth(Math.round(this.qz.y));
+    if (this.qz.visible) this.qz.setDepth(Math.round(this.qz.y));
 
     // ---------- 气泡跟随（内容由调试页手动触发，此处只负责跟随位置） ----------
     for (const w of this.workers) {
       if (w.spr.visible) w.bubble.follow(w.spr, this.cameras.main);
     }
-    if (qzOn) this.qzBubble.follow(this.qz, this.cameras.main);
+    if (this.qz.visible) this.qzBubble.follow(this.qz, this.cameras.main);
     if (this.boss?.visible) this.bossBubble.follow(this.boss, this.cameras.main);
     this.playerBubble.follow(this.char, this.cameras.main);
   }
