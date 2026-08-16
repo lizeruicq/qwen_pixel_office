@@ -88,7 +88,7 @@ export type ServerMessage =
   | { type: 'ui_visibility'; vis: Record<string, boolean> } // 连接建立时下发当前各角色显隐状态（用于刷新后恢复）
   | { type: 'ui_roam'; roam: { player: boolean; qz: boolean } } // 自由行动开关（连接建立时下发 + 切换时广播）；关闭后可长按拖拽
   | { type: 'natural_paused'; paused: boolean } // 属性自然变动暂停状态（连接建立时下发 + 切换时广播）
-  | { type: 'sim_event'; event: string; text?: string; sender?: string; ts: number }; // 调试：模拟时间流事件（千仔回复/at我/群消息/新待办等）
+  | { type: 'qz_reply'; text: string } // 调试：手动触发一条千仔回复，显示在千仔面板聊天里
 
 /** client→server 请求消息 */
 export type ClientMessage =
@@ -104,7 +104,7 @@ export type ClientMessage =
   | { type: 'set_natural_paused'; paused: boolean } // 调试：暂停/恢复属性自然变动
   | {
       type: 'debug_ui';
-      kind: 'panel' | 'dialog' | 'toggle' | 'phone_msg' | 'bubble' | 'sim_event' | 'roam';
+      kind: 'panel' | 'dialog' | 'toggle' | 'phone_msg' | 'bubble' | 'qz_reply' | 'roam';
       image?: string; portrait?: string; portraitKey?: string; text?: string;
       target?: 'qz' | 'workers' | 'boss' | 'phone' | 'worker0' | 'worker1' | 'player'; show?: boolean;
       from?: 'boss' | 'xiaomei';

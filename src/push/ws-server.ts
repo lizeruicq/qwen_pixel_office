@@ -233,10 +233,10 @@ export class PushServer {
       if (msg.type === 'debug_ui') {
         // 调试页控制游戏窗口：弹面板/对话、显隐角色、推手机消息 —— 广播给所有客户端渲染
         const m = msg as {
-          type: 'debug_ui'; kind: 'panel' | 'dialog' | 'toggle' | 'phone_msg' | 'bubble' | 'sim_event' | 'roam';
+          type: 'debug_ui'; kind: 'panel' | 'dialog' | 'toggle' | 'phone_msg' | 'bubble' | 'qz_reply' | 'roam';
           image?: string; portrait?: string; portraitKey?: string; text?: string;
           target?: 'qz' | 'workers' | 'boss' | 'phone' | 'worker0' | 'worker1' | 'player'; show?: boolean; from?: 'boss' | 'xiaomei';
-          event?: string; sender?: string; roam?: { player?: boolean; qz?: boolean };
+          roam?: { player?: boolean; qz?: boolean };
         };
         if (m.kind === 'panel') {
           this.broadcast({ type: 'ui_panel', image: String(m.image ?? ''), text: String(m.text ?? '') });
@@ -254,10 +254,10 @@ export class PushServer {
         } else if (m.kind === 'bubble' && m.target) {
           this.broadcast({ type: 'ui_bubble', target: m.target, text: String(m.text ?? '') });
           log('debug', `气泡 ${m.target}：${String(m.text ?? '').slice(0, 24)}`);
-        } else if (m.kind === 'sim_event' && m.event) {
-          // 模拟时间流：调试页触发一个事件，广播给游戏端按真实事件同样处理
-          this.broadcast({ type: 'sim_event', event: String(m.event), text: String(m.text ?? ''), sender: String(m.sender ?? ''), ts: Date.now() });
-          log('debug', `模拟事件 ${m.event}：${String(m.text ?? '').slice(0, 24)}`);
+        } else if (m.kind === 'qz_reply') {
+          // 调试页手动触发一条千仔回复：广播给游戏端，显示在千仔面板聊天里
+          this.broadcast({ type: 'qz_reply', text: String(m.text ?? '') });
+          log('debug', `千仔回复：${String(m.text ?? '').slice(0, 24)}`);
         } else if (m.kind === 'roam' && m.roam) {
           // 自由行动开关：记住并广播；关闭后对应角色在游戏里可长按拖拽
           if (typeof m.roam.player === 'boolean') this.roam.player = m.roam.player;

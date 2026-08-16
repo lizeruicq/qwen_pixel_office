@@ -275,6 +275,9 @@ export function initPanels(socket) {
       case 'notice':
         addEvent('notice', msg.text);
         break;
+      case 'qz_reply': // 调试页手动触发的千仔回复：进千仔面板聊天
+        addChatRow('qz', msg.text ?? '');
+        break;
       case 'action_result': // 直连工具操作（回复/完成/评论待办等）→ 进事件流，不进千仔聊天
         addEvent('action', `[${msg.status}] ${msg.text ?? ''}`);
         break;

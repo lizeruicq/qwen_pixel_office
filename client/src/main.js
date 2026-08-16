@@ -583,17 +583,6 @@ class OfficeScene extends Phaser.Scene {
       case 'ui_roam': // 自由行动开关（连接建立时下发 + 切换时广播）
         this.setRoam(msg.roam || {});
         break;
-      case 'sim_event': { // 调试页模拟时间流事件：按真实事件同样驱动千仔气泡
-        const sender = msg.sender || '有人';
-        const text = msg.text || '';
-        if (msg.event === 'qz_reply') this.sayQz(text || '我来帮你看看', 3600);
-        else if (msg.event === 'at_me') this.sayQz(`${sender} @ 你了${text ? '：' + text : ''}`, 3600);
-        else if (msg.event === 'o2o_msg') this.sayQz(`${sender} 私聊你${text ? '：' + text : ''}`, 3600);
-        else if (msg.event === 'group_msg') this.sayQz(`${sender} 在群里说话${text ? '：' + text : ''}`, 3000);
-        else if (msg.event === 'todo_added') this.sayQz(`你有新的待办${text ? '：' + text : ''}`, 3200);
-        else this.sayQz(text || '有新消息', 3000);
-        break;
-      }
       case 'ui_phone_msg': // 调试页往手机推一条消息
         this.phone?.push(msg.from, msg.text || '');
         break;

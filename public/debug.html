@@ -118,6 +118,7 @@
       <option value="/assets/objects/systempass.jpg">生产通过</option>
       <option value="/assets/objects/makeplan.jpg">做排期</option>
       <option value="/assets/objects/daily.jpg">写日报</option>
+      <option value="/assets/objects/qianzai.jpg">千仔帮忙</option>
     </select>
     <input id="panel-text" placeholder="面板文字">
     <button class="primary" id="btn-panel">弹出面板</button>
@@ -179,17 +180,9 @@
       <button class="primary" id="btn-bubble">冒一个气泡</button>
     </div>
     <div class="sim-box">
-      <div class="sim-title">模拟时间流（触发一条事件）</div>
-      <select id="sim-event">
-        <option value="qz_reply">千仔回复</option>
-        <option value="at_me">有人 @ 我</option>
-        <option value="o2o_msg">私聊消息</option>
-        <option value="group_msg">群消息</option>
-        <option value="todo_added">新待办</option>
-      </select>
-      <input id="sim-sender" placeholder="触发人（可选，如 老板）">
-      <input id="sim-text" placeholder="事件内容 / 千仔回复文字">
-      <button class="primary" id="btn-sim">触发事件</button>
+      <div class="sim-title">千仔回复（游戏内 · 千仔面板）</div>
+      <input id="qz-reply-text" placeholder="千仔要说的话">
+      <button class="primary" id="btn-qz-reply">触发千仔回复</button>
     </div>
     <ul id="events"></ul>
   </section>
@@ -220,12 +213,12 @@ function route(msg) {
       if ($('roam-qz') && typeof r.qz === 'boolean') $('roam-qz').checked = r.qz;
       break;
     }
+    case 'qz_reply': addEvent({ kind: 'sim', payload: { text: `[千仔回复] ${msg.text ?? ''}` }, ts: Date.now() }); break;
     case 'ui_visibility': { // 后端下发当前显隐状态 → 同步勾选框（刷新后恢复）
       const vis = msg.vis || {};
       for (const k of Object.keys(vis)) { const cb = $('tg-' + k); if (cb) cb.checked = !!vis[k]; }
       break;
     }
-    case 'sim_event': addEvent({ kind: 'sim', payload: { text: `[模拟] ${msg.event}${msg.text ? '：' + msg.text : ''}` }, ts: msg.ts }); break;
   }
 }
 
@@ -349,13 +342,12 @@ $('btn-bubble').onclick = () => {
   send({ type: 'debug_ui', kind: 'bubble', target: $('bb-target').value, text });
   $('bb-text').value = '';
 };
-// 模拟时间流事件
-$('btn-sim').onclick = () => {
-  const event = $('sim-event').value;
-  const text = $('sim-text').value.trim();
-  const sender = $('sim-sender').value.trim();
-  send({ type: 'debug_ui', kind: 'sim_event', event, text, sender });
-  $('sim-text').value = '';
+// 千仔回复（手动触发千仔面板里的一条回复）
+$('btn-qz-reply').onclick = () => {
+  const text = $('qz-reply-text').value.trim();
+  if (!text) return;
+  send({ type: 'debug_ui', kind: 'qz_reply', text });
+  $('qz-reply-text').value = '';
 };
 $('btn-manual').onclick = () => {
   const v = $('manual-dt').value; // "YYYY-MM-DDTHH:mm"
